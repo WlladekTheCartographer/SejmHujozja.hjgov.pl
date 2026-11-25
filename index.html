@@ -150,11 +150,54 @@ function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return
 function num(v){v=parseInt(v,10);return isNaN(v)||v<0?0:v}
 function rid(){return 'p'+Math.random().toString(36).slice(2,8)}
 function sum(a){return a.reduce(function(x,y){return x+y},0)}
-async function api(a,body){
-  var r=await fetch('?a='+a,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{cache:'no-store'});
-  var j;try{j=await r.json()}catch(e){throw new Error('Serwer nie odpowiada poprawnie (sprawdź, czy PHP działa).')}
-  if(!r.ok)throw new Error(j.error||'Błąd');return j;
+
+const SUPABASE_URL = 'https://supabase.com/dashboard/project/ggckmiocsslbwjtjfqxl';
+const SUPABASE_KEY = 'sb_publishable_2QKIst8bdJbqJhyWBpwc8A_Ky8sBFHr';
+
+const sb = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+async function api(action, body = {}) {
+  const functions = {
+    state: 'public-state',
+    vote: 'submit-vote',
+    admin_state: 'admin-state',
+    save_parties: 'admin-save-parties',
+    start: 'admin-start',
+    toggle: 'admin-toggle',
+    publish: 'admin-publish',
+    tick: 'sound-state',
+    sound: 'admin-sound',
+    close_in: 'admin-close-in',
+    close_cancel: 'admin-close-cancel',
+    snd_auto: 'admin-sound-auto',
+    history: 'public-history'
+  };
+
+  const name = functions[action];
+
+  if (!name) {
+    throw new Error('Nieznana operacja');
+  }
+
+  const { data, error } = await sb.functions.invoke(
+    name,
+    { body }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+
+  return data;
 }
+
 async function poll(){
   try{
     var s=pass?await api('admin_state',{pass:pass}):await api('state');
@@ -297,17 +340,12 @@ function kindChange(sel){
 }
 
 async function adminLogin(){
-  var p=prompt('Hasło marszałka:');if(!p)return;
-  try{
-    var s=await api('admin_state',{pass:p});pass=p;
-    var src=s.tpl||(s.cur&&s.cur.parties)||[{id:rid(),n:'Partia A',s:100,pin:''},{id:rid(),n:'Partia B',s:80,pin:''},{id:rid(),n:'Partia C',s:60,pin:''}];
-    draft={parties:src.map(function(x){return{id:x.id,n:x.n,s:x.s,pin:x.pin||''}})};
-    $('mTitle').value=s.cur?s.cur.title:'';
-    $('mKind').value=s.cur?s.cur.kind:'yn';kindChange(s.cur?s.cur.rule:null);
-    $('mOpts').value=s.cur?(s.cur.options||[]).join('\n'):'';
-    renderDraft();$('mBox').classList.remove('hide');$('admLink').classList.add('hide');
-    cur=s.cur;votes=s.votes||{};voted=s.voted||[];renderAll();
-  }catch(e){alert(e.message)}
+  const { data, error } = await sb.auth.signInWithPassword({
+  email: email,
+  password: password
+});
+
+if (error) throw error;
 }
 function renderDraft(){
   $('mParties').innerHTML=draft.parties.map(function(p,i){return '<div class="row" style="margin-bottom:6px">'+
