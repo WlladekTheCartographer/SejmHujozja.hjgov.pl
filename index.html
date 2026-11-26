@@ -76,18 +76,40 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
   <div class="note">Możesz wysłać głosy ponownie (nadpiszą poprzednie), dopóki marszałek nie zamknie głosowania.</div>
 </section>
 
-<section class="card" id="resBox">
-  <h2>Wynik</h2>
-  <div id="verdict" class="verdict mut"></div>
-  <div class="board hide" id="board"></div>
-  <div class="nums" id="nums"></div>
-  <div class="bar" id="bar"></div>
-  <div class="note" id="detail"></div>
-  <div class="scroll" style="margin-top:10px"><table>
-    <thead id="thead"></thead>
-    <tbody id="rows"></tbody><tfoot><tr class="tot" id="tot"></tr></tfoot>
-  </table></div>
+
+<section class="card hide" id="loginBox">
+  <h2>Logowanie marszałka</h2>
+
+  <form id="loginForm">
+    <div class="row">
+      <label class="wide">
+        E-mail
+        <input
+          id="loginEmail"
+          type="email"
+          autocomplete="username"
+          required
+        >
+      </label>
+
+      <label class="wide">
+        Hasło
+        <input
+          id="loginPassword"
+          type="password"
+          autocomplete="current-password"
+          required
+        >
+      </label>
+
+      <button class="pri" type="submit">Zaloguj</button>
+      <button type="button" id="cancelLogin">Anuluj</button>
+    </div>
+  </form>
+
+  <div class="msg" id="loginMsg" role="status"></div>
 </section>
+
 
 <section class="card hide" id="mBox">
   <h2>Panel marszałka</h2>
@@ -140,7 +162,7 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
   <div class="note" style="margin-top:8px">Dźwięki są generowane w przeglądarce każdego gracza – każdy musi kliknąć przycisk „Dźwięk” na górze strony. Odliczanie pika w ostatnich 5 sekundach, a potem głosowanie zamyka się samo.</div>
 </section>
 
-<p><a class="lnk" href="?a=history">📄 Pobierz historię głosowań (.txt)</a> &nbsp; <a class="lnk" id="admLink" onclick="adminLogin()">Panel marszałka</a></p>
+<p><a class="lnk" href="?a=history">📄 Pobierz historię głosowań (.txt)</a> &nbsp; <a class="lnk" id="admLink" href="#marshal">Panel marszałka</a></p>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -326,49 +348,119 @@ function kindChange(sel){
 }
 
 
-async function adminLogin() {
-  const email = prompt('Podaj adres e-mail konta marszałka:');
-  if (email === null || !email.trim()) return;
 
-  const password = prompt('Podaj hasło do tego konta:');
-  if (password === null || !password) return;
+$('admLink').addEventListener('click', async function(ev) {
+  ev.preventDefault();
+
+  if (pass) {
+    $('mBox').classList.toggle('hide');
+    return;
+  }
+
+  $('loginBox').classList.remove('hide');
+  $('loginEmail').focus();
+});
+
+$('cancelLogin').addEventListener('click', function() {
+  $('loginBox').classList.add('hide');
+  $('loginMsg').textContent = '';
+  $('loginForm').reset();
+});
+
+$('loginForm').addEventListener('submit', async function(ev) {
+  ev.preventDefault();
+
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+
+  $('loginMsg').textContent = 'Logowanie…';
+  $('loginMsg').className = 'msg';
 
   try {
     const { error } = await sb.auth.signInWithPassword({
-      email: email.trim(),
-      password
+      email: email,
+      password: password
     });
 
     if (error) throw error;
 
-    // Backend sprawdzi, czy konto ma uprawnienia marszałka.
     const result = await api('admin_state');
 
     pass = 'authenticated';
-    cur = result.cur;
+    cur = result.cur || null;
     votes = result.votes || {};
     voted = result.voted || [];
 
     draft = {
-      parties: (result.parties || []).map(p => ({
-        id: p.id,
-        n: p.n,
-        s: Number(p.s),
-        pin: ''
-      }))
+      parties: (result.parties || []).map(function(p) {
+        return {
+          id: p.id,
+          n: p.n,
+          s: Number(p.s),
+          pin: '',
+          hasPin: p.hasPin,
+          clearPin: false
+        };
+      })
     };
 
     lastKey = '';
+    $('loginBox').classList.add('hide');
+    $('mBox').classList.remove('hide');
+
+    renderDraft();
+    renderAll();
+
+    $('loginMsg').textContent = '';
+    $('loginForm').reset();
+    $('mBox').scrollIntoView({ behavior: 'smooth' });
+  } catch (error) {
+    $('loginMsg').textContent =
+      'Nie udało się zalogować: ' + error.message;
+    $('loginMsg').className = 'msg err';
+  }
+});
+
+async function checkSession() {
+  const { data, error } = await sb.auth.getSession();
+
+  if (error || !data.session) {
+    pass = '';
+    $('mBox').classList.add('hide');
+    return;
+  }
+
+  try {
+    const result = await api('admin_state');
+
+    pass = 'authenticated';
+    cur = result.cur || null;
+    votes = result.votes || {};
+    voted = result.voted || [];
+
+    draft = {
+      parties: (result.parties || []).map(function(p) {
+        return {
+          id: p.id,
+          n: p.n,
+          s: Number(p.s),
+          pin: '',
+          hasPin: p.hasPin,
+          clearPin: false
+        };
+      })
+    };
+
+    $('loginBox').classList.add('hide');
     $('mBox').classList.remove('hide');
     renderDraft();
     renderAll();
-    say('Zalogowano do panelu marszałka.', true);
-    $('mBox').scrollIntoView({ behavior: 'smooth' });
-  } catch (e) {
+  } catch (error) {
     pass = '';
-    alert('Nie udało się zalogować: ' + e.message);
+    $('mBox').classList.add('hide');
   }
 }
+
 
 function renderDraft(){
   $('mParties').innerHTML=draft.parties.map(function(p,i){return '<div class="row" style="margin-bottom:6px">'+
@@ -399,7 +491,11 @@ async function mPublish(){
   try{await api('publish',{pass:pass,result:e.res,need:e.need});say('✅ Wyniki opublikowane i zapisane w historii.',true);poll()}catch(x){say(x.message,false)}
 }
 
-poll();setInterval(poll,3000);
+checkSession().then(function() {
+  poll();
+});
+
+setInterval(poll, 3000);
 
 /* ---- dźwięki sali obrad ---- */
 var AC=null,MASTER=null,sndOn=true,vol=0.7,lastSeq=null,clo=null;
