@@ -32,14 +32,16 @@ async function sha256(value: string) {
     .join("");
 }
 
+
 function safeParty(p: any) {
   return {
-    id: p.id,
+    id: p.id ?? p.party_id,
     n: p.name ?? p.party_name,
     s: Number(p.seats),
     hasPin: Boolean(p.pin_hash),
   };
 }
+
 
 async function getSession() {
   const { data, error } = await admin
