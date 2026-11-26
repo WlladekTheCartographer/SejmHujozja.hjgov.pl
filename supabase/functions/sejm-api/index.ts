@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const cors = {
@@ -32,7 +33,6 @@ async function sha256(value: string) {
     .join("");
 }
 
-
 function safeParty(p: any) {
   return {
     id: p.id ?? p.party_id,
@@ -41,7 +41,6 @@ function safeParty(p: any) {
     hasPin: Boolean(p.pin_hash),
   };
 }
-
 
 async function getSession() {
   const { data, error } = await admin
@@ -111,13 +110,15 @@ async function maybeClose(session: any, control: any) {
 
     if (error) throw error;
 
-    await admin
+    const { error: controlError } = await admin
       .from("app_control")
       .update({
         closing_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", true);
+
+    if (controlError) throw controlError;
 
     if (control.auto_sound) await setSound("vend");
 
@@ -142,9 +143,7 @@ async function loadState(isAdmin: boolean) {
       seq: Number(control.sound_seq || 0),
       soundType: control.sound_type,
       soundAge: 999,
-      closing: control.closing_at
-        ? { at: control.closing_at }
-        : null,
+      closing: control.closing_at ? { at: control.closing_at } : null,
     };
   }
 
@@ -156,9 +155,6 @@ async function loadState(isAdmin: boolean) {
   if (spErr) throw spErr;
 
   const parties = (sp || []).map(safeParty);
-
-  // Dane o PIN-ach pochodzą z aktualnej tabeli partii.
-  // Przed publikacją wyników anonimowi użytkownicy nie otrzymują liczby głosów.
   const ids = parties.map((p: any) => p.id);
 
   if (ids.length) {
@@ -223,9 +219,7 @@ async function loadState(isAdmin: boolean) {
     seq: Number(control.sound_seq || 0),
     soundType: control.sound_type,
     soundAge: age,
-    closing: control.closing_at
-      ? { at: control.closing_at }
-      : null,
+    closing: control.closing_at ? { at: control.closing_at } : null,
   };
 }
 
@@ -273,9 +267,7 @@ async function requireAdmin(req: Request) {
 async function history() {
   const { data, error } = await admin
     .from("voting_sessions")
-    .select(
-      "vote_number,title,kind,rule,options,result,published_at",
-    )
+    .select("vote_number,title,kind,rule,options,result,published_at")
     .eq("status", "published")
     .order("vote_number", { ascending: false });
 
@@ -294,9 +286,7 @@ async function history() {
       `Głosowało: ${r.cast ?? "—"}; za: ${r.Z ?? "—"}; przeciw: ${
         r.P ?? "—"
       }; wstrzymało się: ${r.W ?? "—"}`,
-      s.options?.length
-        ? `Opcje: ${s.options.join(", ")}`
-        : "",
+      s.options?.length ? `Opcje: ${s.options.join(", ")}` : "",
     ].filter(Boolean);
 
     return { text: lines.join("\n") };
@@ -314,10 +304,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (!url || !anon || !serviceKey) {
-      return fail(
-        "Brak konfiguracji sekretów Supabase dla funkcji.",
-        500,
-      );
+      return fail("Brak konfiguracji sekretów Supabase dla funkcji.", 500);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -396,13 +383,9 @@ Deno.serve(async (req: Request) => {
       if (party.pin_hash) {
         const pin = String(body.pin || "");
 
-        if (!pin) {
-          return fail("Wpisz PIN partii.", 401);
-        }
+        if (!pin) return fail("Wpisz PIN partii.", 401);
 
-        const candidate = await sha256(
-          `${party.pin_salt}:${pin}`,
-        );
+        const candidate = await sha256(`${party.pin_salt}:${pin}`);
 
         if (candidate !== party.pin_hash) {
           return fail("Nieprawidłowy PIN partii.", 401);
@@ -438,9 +421,7 @@ Deno.serve(async (req: Request) => {
         abstain,
       ];
 
-      if (
-        all.some((x) => !Number.isInteger(x) || x < 0)
-      ) {
+      if (all.some((x) => !Number.isInteger(x) || x < 0)) {
         return fail(
           "Liczby głosów muszą być nieujemnymi liczbami całkowitymi.",
         );
@@ -469,8 +450,6 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true });
     }
 
-    // Wszystkie pozostałe operacje wymagają zalogowanego marszałka
-    // znajdującego się w public.admin_users.
     await requireAdmin(req);
 
     if (action === "admin_state") {
@@ -581,8 +560,6 @@ Deno.serve(async (req: Request) => {
         if (error) throw error;
       }
 
-      // Pominięte partie są archiwizowane, a nie usuwane,
-      // dzięki czemu zachowane zostają powiązania z historią głosowań.
       for (const p of old || []) {
         if (!incomingIds.has(p.id)) {
           const { error } = await admin
@@ -604,14 +581,10 @@ Deno.serve(async (req: Request) => {
 
       const options =
         kind === "choice" && Array.isArray(body.options)
-          ? body.options
-              .map((x: any) => String(x).trim())
-              .filter(Boolean)
+          ? body.options.map((x: any) => String(x).trim()).filter(Boolean)
           : [];
 
-      if (!title) {
-        return fail("Podaj nazwę głosowania.");
-      }
+      if (!title) return fail("Podaj nazwę głosowania.");
 
       if (
         kind === "yn" &&
@@ -635,9 +608,7 @@ Deno.serve(async (req: Request) => {
           new Set(options).size !== options.length
         )
       ) {
-        return fail(
-          "Wybór musi mieć od 2 do 10 różnych opcji.",
-        );
+        return fail("Wybór musi mieć od 2 do 10 różnych opcji.");
       }
 
       const { data: parties, error: pErr } = await admin
@@ -652,17 +623,11 @@ Deno.serve(async (req: Request) => {
         return fail("Najpierw dodaj co najmniej jedną partię.");
       }
 
-      const { data: latest } = await admin
-        .from("voting_sessions")
-        .select("vote_number")
-        .order("vote_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
+      // vote_number jest generowane przez bazę danych.
+      // Nie odczytujemy ostatniego numeru ani nie wpisujemy go ręcznie.
       const { data: session, error } = await admin
         .from("voting_sessions")
         .insert({
-          vote_number: Number(latest?.vote_number || 0) + 1,
           title,
           kind,
           rule,
@@ -710,9 +675,7 @@ Deno.serve(async (req: Request) => {
       if (!s) return fail("Brak głosowania.");
 
       if (s.status === "published") {
-        return fail(
-          "Opublikowanego głosowania nie można ponownie otworzyć.",
-        );
+        return fail("Opublikowanego głosowania nie można ponownie otworzyć.");
       }
 
       const open = s.status !== "open";
@@ -729,10 +692,12 @@ Deno.serve(async (req: Request) => {
 
       const c = await getControl();
 
-      await admin
+      const { error: controlError } = await admin
         .from("app_control")
         .update({ closing_at: null })
         .eq("id", true);
+
+      if (controlError) throw controlError;
 
       if (c.auto_sound) {
         await setSound(open ? "vstart" : "vend");
@@ -745,10 +710,7 @@ Deno.serve(async (req: Request) => {
       const s = await getSession();
 
       if (!s) return fail("Brak głosowania.");
-
-      if (s.status === "published") {
-        return fail("Wyniki są już opublikowane.");
-      }
+      if (s.status === "published") return fail("Wyniki są już opublikowane.");
 
       const { data: rows, error: vErr } = await admin
         .from("votes")
@@ -769,7 +731,6 @@ Deno.serve(async (req: Request) => {
         0,
       );
 
-      
       let Z = 0;
       let P = 0;
       let W = 0;
@@ -780,18 +741,13 @@ Deno.serve(async (req: Request) => {
         P += Number(r.no_votes || 0);
         W += Number(r.abstain_votes || 0);
 
-        (r.choice_votes || []).forEach(
-          (x: number, i: number) => {
-            if (i < C.length) C[i] += Number(x || 0);
-          },
-        );
+        (r.choice_votes || []).forEach((x: number, i: number) => {
+          if (i < C.length) C[i] += Number(x || 0);
+        });
       }
 
-      // Liczba oddanych głosów.
-      const cast = Z + P + W + C.reduce(
-        (a: number, b: number) => a + b,
-        0,
-      );
+      const cast =
+        Z + P + W + C.reduce((a: number, b: number) => a + b, 0);
 
       const rule = String(s.rule || "simple");
 
@@ -827,16 +783,12 @@ Deno.serve(async (req: Request) => {
         switch (rule) {
           case "simple":
             need = P + 1;
-            res = Z > P
-              ? "Wniosek przyjęty"
-              : "Wniosek odrzucony";
+            res = Z > P ? "Wniosek przyjęty" : "Wniosek odrzucony";
             break;
 
           case "abs":
             need = P + W + 1;
-            res = Z > P + W
-              ? "Wniosek przyjęty"
-              : "Wniosek odrzucony";
+            res = Z > P + W ? "Wniosek przyjęty" : "Wniosek odrzucony";
             break;
 
           case "35":
@@ -872,7 +824,6 @@ Deno.serve(async (req: Request) => {
         winner,
       };
 
-
       const { error } = await admin
         .from("voting_sessions")
         .update({
@@ -885,10 +836,12 @@ Deno.serve(async (req: Request) => {
 
       if (error) throw error;
 
-      await admin
+      const { error: controlError } = await admin
         .from("app_control")
         .update({ closing_at: null })
         .eq("id", true);
+
+      if (controlError) throw controlError;
 
       const c = await getControl();
       if (c.auto_sound) await setSound("vend");
@@ -900,15 +853,7 @@ Deno.serve(async (req: Request) => {
       const type = String(body.type || "");
 
       if (
-        ![
-          "gavel",
-          "bell",
-          "timer",
-          "call",
-          "vstart",
-          "vend",
-          "tick",
-        ].includes(type)
+        !["gavel", "bell", "timer", "call", "vstart", "vend", "tick"].includes(type)
       ) {
         return fail("Nieznany dźwięk.");
       }
@@ -936,14 +881,8 @@ Deno.serve(async (req: Request) => {
     if (action === "close_in") {
       const secs = Number(body.secs);
 
-      if (
-        !Number.isInteger(secs) ||
-        secs < 3 ||
-        secs > 300
-      ) {
-        return fail(
-          "Odliczanie musi mieć 3–300 sekund.",
-        );
+      if (!Number.isInteger(secs) || secs < 3 || secs > 300) {
+        return fail("Odliczanie musi mieć 3–300 sekund.");
       }
 
       const s = await getSession();
@@ -952,9 +891,7 @@ Deno.serve(async (req: Request) => {
         return fail("Głosowanie nie jest otwarte.");
       }
 
-      const at = new Date(
-        Date.now() + secs * 1000,
-      ).toISOString();
+      const at = new Date(Date.now() + secs * 1000).toISOString();
 
       const { error } = await admin
         .from("app_control")
@@ -983,32 +920,31 @@ Deno.serve(async (req: Request) => {
 
     return fail("Nieznana operacja.");
   } catch (e) {
-  console.error("Błąd sejm-api:", e);
+    console.error("Błąd sejm-api:", e);
 
-  const err = e as {
-    message?: string;
-    details?: string;
-    hint?: string;
-    code?: string;
-  };
+    const err = e as {
+      message?: string;
+      details?: string;
+      hint?: string;
+      code?: string;
+    };
 
-  const message =
-    err?.message ||
-    (typeof e === "string" ? e : "Nieznany błąd serwera.");
+    const message =
+      err?.message ||
+      (typeof e === "string" ? e : "Nieznany błąd serwera.");
 
-  console.error("Szczegóły błędu:", {
-    message: err?.message,
-    details: err?.details,
-    hint: err?.hint,
-    code: err?.code,
-  });
+    console.error("Szczegóły błędu:", {
+      message: err?.message,
+      details: err?.details,
+      hint: err?.hint,
+      code: err?.code,
+    });
 
-  return fail(
-    message,
-    message.includes("Zalog") ||
-      message.includes("uprawnień")
-      ? 401
-      : 500,
-  );
-}
+    return fail(
+      message,
+      message.includes("Zalog") || message.includes("uprawnień")
+        ? 401
+        : 500,
+    );
+  }
 });
