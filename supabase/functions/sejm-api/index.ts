@@ -769,27 +769,94 @@ Deno.serve(async (req: Request) => {
         0,
       );
 
+      
       let Z = 0;
       let P = 0;
       let W = 0;
       const C = (s.options || []).map(() => 0);
 
       for (const r of rows || []) {
-        Z += r.yes_votes;
-        P += r.no_votes;
-        W += r.abstain_votes;
+        Z += Number(r.yes_votes || 0);
+        P += Number(r.no_votes || 0);
+        W += Number(r.abstain_votes || 0);
 
         (r.choice_votes || []).forEach(
           (x: number, i: number) => {
-            if (i < C.length) C[i] += x;
+            if (i < C.length) C[i] += Number(x || 0);
           },
         );
       }
 
+      // Liczba oddanych głosów.
       const cast = Z + P + W + C.reduce(
         (a: number, b: number) => a + b,
         0,
       );
+
+      const rule = String(s.rule || "simple");
+
+      let res = "";
+      let need: number | null = null;
+      let winner: number | null = null;
+
+      if (s.kind === "choice") {
+        const maxVotes = Math.max(0, ...C);
+        const winners = C
+          .map((votes: number, i: number) => ({ votes, i }))
+          .filter((x: any) => x.votes === maxVotes);
+
+        if (maxVotes > 0 && winners.length === 1) {
+          winner = winners[0].i;
+
+          if (
+            rule === "plur" ||
+            (rule === "abs" && maxVotes > cast / 2)
+          ) {
+            res = `Wybrano: ${s.options[winner]}`;
+          } else {
+            res = "Nie osiągnięto wymaganej większości";
+          }
+        } else {
+          res = "Remis — brak rozstrzygnięcia";
+        }
+
+        if (rule === "abs") {
+          need = Math.floor(cast / 2) + 1;
+        }
+      } else {
+        switch (rule) {
+          case "simple":
+            need = P + 1;
+            res = Z > P
+              ? "Wniosek przyjęty"
+              : "Wniosek odrzucony";
+            break;
+
+          case "abs":
+            need = P + W + 1;
+            res = Z > P + W
+              ? "Wniosek przyjęty"
+              : "Wniosek odrzucony";
+            break;
+
+          case "35":
+            need = Math.ceil(cast * 3 / 5);
+            res = Z >= need && cast > 0
+              ? "Wniosek przyjęty"
+              : "Wniosek odrzucony";
+            break;
+
+          case "23":
+            need = Math.ceil(cast * 2 / 3);
+            res = Z >= need && cast > 0
+              ? "Wniosek przyjęty"
+              : "Wniosek odrzucony";
+            break;
+
+          default:
+            return fail("Nieznana reguła większości.");
+        }
+      }
 
       const result = {
         Z,
@@ -798,10 +865,13 @@ Deno.serve(async (req: Request) => {
         C,
         cast,
         N,
-        absent: N - cast,
-        res: body.result || "",
-        need: body.need ?? null,
+        absent: Math.max(0, N - cast),
+        res,
+        need,
+        rule,
+        winner,
       };
+
 
       const { error } = await admin
         .from("voting_sessions")
