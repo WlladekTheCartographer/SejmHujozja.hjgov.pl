@@ -1,999 +1,631 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sejm – głosowania</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--tx:#1d1d1b;--mut:#6b6b66;--bd:#ddd9cf;--ac:#b3202a;--ok:#1f7a3d;--no:#b3202a;--ab:#b07a00}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--card:#222220;--tx:#eeece6;--mut:#a09d94;--bd:#3a3935;--ac:#e0505a;--ok:#4fc27a;--no:#e0505a;--ab:#e0b040;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:.2em 0 .1em}
+h2{font-size:1.05rem;margin:0 0 10px}
+.sub{color:var(--mut);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:14px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:420px}
+th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);text-align:left;padding:4px 6px}
+td{padding:5px 6px;border-top:1px solid var(--bd)}
+input,select,button,textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+input[type=number]{width:80px}
+textarea{width:100%;min-height:90px}
+button{cursor:pointer}
+button.pri{background:var(--ac);border-color:var(--ac);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+button.sm{padding:4px 8px;font-size:.8rem}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row label{display:flex;flex-direction:column;font-size:.8rem;color:var(--mut);gap:3px}
+.tot td{font-weight:700;border-top:2px solid var(--bd)}
+.zs{color:var(--ok)}.ps{color:var(--no)}.ws{color:var(--ab)}.mut{color:var(--mut)}
+.verdict{font-size:1.6rem;font-weight:800;margin:6px 0}
+.bar{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--bd);margin:8px 0}
+.bar div{height:100%}
+.nums{display:flex;gap:18px;flex-wrap:wrap}
+.nums b{font-size:1.4rem}
+.note{font-size:.85rem;color:var(--mut)}
+.msg{font-size:.92rem;margin:8px 0}
+.remain{font-weight:700;margin:10px 0 2px}
+.err{color:var(--no)}.good{color:var(--ok)}
+.badge{display:inline-block;font-size:.75rem;padding:2px 8px;border-radius:99px;border:1px solid var(--bd)}
+.hide{display:none}
+a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline}
+.board{background:#fff;color:#111;font-family:"Times New Roman",Times,serif;font-weight:700;text-transform:uppercase;border-radius:8px;padding:16px 22px;margin:10px 0 14px;border:1px solid var(--bd)}
+.board .bt{text-align:center;font-size:clamp(1.3rem,5vw,2.1rem)}
+.board .bs{text-align:center;font-weight:400;text-transform:none;font-size:.95rem;color:#555;margin-bottom:8px}
+.board .br{display:flex;justify-content:space-between;gap:14px;font-size:clamp(1.3rem,5.5vw,2.5rem);line-height:1.3}
+.sndbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}
+.sndbar input[type=range]{width:110px;padding:0}
+.closing{background:var(--card);border:1px solid var(--ab);border-radius:12px;padding:10px 14px;margin-bottom:14px}
+.closing b{font-size:1.4rem;color:var(--ab)}
+</style>
+</head>
+<body>
+<main>
+<h1>🏛️ Sejm – głosowania</h1>
+<div class="sndbar">
+  <button id="sndBtn" onclick="sndToggle()">Dźwięk: wyłączony (kliknij, aby włączyć)</button>
+  <label class="note">Głośność <input type="range" id="sndVol" min="0" max="100" value="70" oninput="sndVolChange()"></label>
+</div>
+<div class="closing hide" id="closeBox">Głosowanie zostanie zamknięte za <b id="closeSec">0</b> s</div>
+<p class="sub">Wybierz swoją partię, wpisz głosy i wyślij. Głosowanie jest tajne – wyniki opublikuje marszałek.</p>
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+<section class="card" id="info"></section>
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...cors, "Content-Type": "application/json" },
+<section class="card hide" id="playerBox">
+  <h2>Twoje głosy</h2>
+  <div class="row">
+    <label>Twoja partia<select id="pSel" onchange="pickParty()"></select></label>
+    <label id="pinWrap" class="hide">PIN partii<input type="password" id="pin" style="width:110px" autocomplete="off"></label>
+    <span id="fields" style="display:contents"></span>
+    <button class="pri" id="send" onclick="sendVotes()">Wyślij głosy</button>
+  </div>
+  <div class="remain" id="remain"></div>
+  <div class="msg" id="pMsg"></div>
+  <div class="note">Możesz wysłać głosy ponownie (nadpiszą poprzednie), dopóki marszałek nie zamknie głosowania.</div>
+</section>
+
+
+<section class="card hide" id="loginBox">
+  <h2>Logowanie marszałka</h2>
+
+  <form id="loginForm">
+    <div class="row">
+      <label class="wide">
+        E-mail
+        <input
+          id="loginEmail"
+          type="email"
+          autocomplete="username"
+          required
+        >
+      </label>
+
+      <label class="wide">
+        Hasło
+        <input
+          id="loginPassword"
+          type="password"
+          autocomplete="current-password"
+          required
+        >
+      </label>
+
+      <button class="pri" type="submit">Zaloguj</button>
+      <button type="button" id="cancelLogin">Anuluj</button>
+    </div>
+  </form>
+
+  <div class="msg" id="loginMsg" role="status"></div>
+</section>
+
+
+<section class="card hide" id="mBox">
+  <h2>Panel marszałka</h2>
+  <h2>1. Partie <span class="note">(PIN opcjonalny – jeśli ustawisz, gracz musi go podać)</span></h2>
+  <div id="mParties"></div>
+  <div class="row" style="margin-top:8px">
+    <button onclick="mAdd()">+ Dodaj partię</button>
+    <button class="pri" onclick="mSave()">Zapisz partie</button>
+  </div>
+  <h2 style="margin-top:18px">2. Głosowanie</h2>
+  <div class="row">
+    <label style="flex:1;min-width:200px">Nazwa ustawy / uchwały / wyboru<input id="mTitle" placeholder="np. Wybór ministra obrony"></label>
+    <label>Rodzaj
+      <select id="mKind" onchange="kindChange()">
+        <option value="yn">Za / przeciw / wstrzymało się</option>
+        <option value="choice">Wybór spośród kandydatów / opcji</option>
+      </select></label>
+    <label>Wymagana większość<select id="mRule"></select></label>
+  </div>
+  <div id="mOptsWrap" class="hide" style="margin-top:10px">
+    <label class="note">Kandydaci / opcje (każdy w osobnej linii, od 2 do 10)</label>
+    <textarea id="mOpts" placeholder="Jan Kowalski&#10;Anna Nowak&#10;Piotr Wiśniewski"></textarea>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="pri" onclick="mStart()">Rozpocznij nowe głosowanie</button>
+    <button id="mToggle" onclick="mToggle()">Zamknij głosowanie</button>
+    <button id="mPub" onclick="mPublish()">Opublikuj wyniki</button>
+  </div>
+  <div class="msg" id="mMsg"></div>
+  <div class="note">Podczas głosowania tylko Ty widzisz głosy partii. „Opublikuj wyniki” zamyka głosowanie, pokazuje wyniki wszystkim i zapisuje je w historii. „Rozpocznij nowe głosowanie” zeruje głosy (jeśli poprzednie nie było opublikowane, nie trafi do historii).</div>
+
+  <h2 style="margin-top:18px">3. Sala obrad – dźwięki</h2>
+  <div class="row">
+    <button onclick="snd('gavel')">Otwarcie / zamknięcie posiedzenia (3 × laska)</button>
+    <button onclick="snd('bell')">Dzwonek marszałka</button>
+    <button onclick="snd('timer')">Dzwonek – koniec czasu</button>
+    <button onclick="snd('call')">Wezwanie posłów na salę</button>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button onclick="snd('vstart')">Sygnał: początek głosowania</button>
+    <button onclick="snd('vend')">Sygnał: koniec głosowania</button>
+  </div>
+  <label class="note" style="display:block;margin-top:8px"><input type="checkbox" id="mAuto" checked onchange="mAutoSnd()"> Graj sygnał automatycznie przy rozpoczęciu i zamknięciu głosowania</label>
+  <h2 style="margin-top:14px">Odliczanie do zamknięcia głosowania</h2>
+  <div class="row">
+    <label>Sekundy<input type="number" id="cSecs" min="3" max="300" value="10"></label>
+    <button onclick="cIn()">Zamknij głosowanie za…</button>
+    <button onclick="cCancel()">Anuluj odliczanie</button>
+  </div>
+  <div class="note" style="margin-top:8px">Dźwięki są generowane w przeglądarce każdego gracza – każdy musi kliknąć przycisk „Dźwięk” na górze strony. Odliczanie pika w ostatnich 5 sekundach, a potem głosowanie zamyka się samo.</div>
+</section>
+
+<p><a class="lnk" href="?a=history">📄 Pobierz historię głosowań (.txt)</a> &nbsp; <a class="lnk" id="admLink" href="#marshal">Panel marszałka</a></p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+var cur=null,votes={},voted=[],draft=null,pass='',lastKey='';
+var $=function(i){return document.getElementById(i)};
+function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function num(v){v=parseInt(v,10);return isNaN(v)||v<0?0:v}
+function rid(){return 'p'+Math.random().toString(36).slice(2,8)}
+function sum(a){return a.reduce(function(x,y){return x+y},0)}
+
+const SUPABASE_URL = 'https://ggckmiocsslbwjtjfqxl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_2QKIst8bdJbqJhyWBpwc8A_Ky8sBFHr';
+
+const sb = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+
+
+async function api(action, body = {}) {
+  const { data, error } = await sb.functions.invoke('sejm-api', {
+    body: { ...body, action }
   });
 
-const fail = (message: string, status = 400) => json({ error: message }, status);
-const env = (key: string) => Deno.env.get(key) ?? "";
+  if (error) {
+    let message = error.message || 'Błąd połączenia z Supabase';
 
-const url = env("SUPABASE_URL");
-const anon = env("SUPABASE_ANON_KEY");
-const serviceKey = env("SUPABASE_SERVICE_ROLE_KEY");
+    try {
+      const details = await error.context.json();
+      if (details?.error) message = details.error;
+    } catch (_) {}
 
-const admin = createClient(url, serviceKey, {
-  auth: { persistSession: false, autoRefreshToken: false },
+    throw new Error(message);
+  }
+
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+
+  return data;
+}api
+
+async function poll(){
+  try{
+    var s=pass?await api('admin_state',{pass:pass}):await api('state');
+    cur=s.cur;votes=s.votes||{};voted=s.voted||[];renderAll();
+  }catch(e){}
+}
+
+var RN={simple:'zwykła większość',abs:'bezwzględna większość','35':'3/5 głosów','23':'2/3 głosów',plur:'najwięcej głosów'};
+function renderAll(){
+  renderInfo();renderForm();renderResults();
+  if(pass){
+    $('mToggle').textContent=cur&&cur.open?'Zamknij głosowanie':'Otwórz ponownie';
+    $('mToggle').disabled=!cur||cur.published;
+    $('mPub').disabled=!cur||cur.published;
+    $('mPub').textContent=cur&&cur.published?'Wyniki opublikowane':'Opublikuj wyniki';
+  }
+}
+function renderInfo(){
+  if(!cur){$('info').innerHTML='<h2>Brak aktywnego głosowania</h2><div class="note">Poczekaj, aż marszałek rozpocznie głosowanie.</div>';return}
+  $('info').innerHTML='<h2>'+esc(cur.title)+'</h2><span class="badge">'+(cur.kind==='choice'?'Wybór: '+esc(cur.options.join(' / '))+' · ':'')+RN[cur.rule]+'</span> <span class="badge" style="color:var(--'+(cur.open?'ok':'no')+')">'+(cur.open?'Głosowanie otwarte':'Głosowanie zamknięte')+'</span> <span class="badge">'+(cur.published?'Wyniki jawne':'Głosowanie tajne')+'</span>';
+}
+
+/* ---- formularz gracza ---- */
+function vals(){return Array.prototype.map.call(document.querySelectorAll('.vin'),function(i){return num(i.value)})}
+function myParty(){var pid=$('pSel').value;return cur.parties.filter(function(x){return x.id===pid})[0]}
+function remain(){
+  var p=myParty();if(!p)return;
+  var left=p.s-sum(vals()),r=$('remain');
+  r.textContent='Pozostało do rozdysponowania: '+left+' z '+p.s+' posłów'+(left<0?' – za dużo!':'');
+  r.className='remain'+(left<0?' err':left===0?' good':'');
+}
+function renderForm(){
+  var box=$('playerBox');
+  if(!cur){box.classList.add('hide');return}
+  box.classList.remove('hide');
+  var key=cur.id+'|'+cur.open+'|'+JSON.stringify(cur.parties)+'|'+JSON.stringify(cur.options);
+  if(key===lastKey)return;lastKey=key;
+  var saved='';try{saved=localStorage.getItem('sejm-party')||''}catch(e){}
+  $('pSel').innerHTML=cur.parties.map(function(p){return '<option value="'+p.id+'"'+(p.id===saved?' selected':'')+'>'+esc(p.n)+' ('+p.s+')</option>'}).join('');
+  var items=cur.kind==='choice'?cur.options.map(function(o){return{l:o,c:''}}).concat([{l:'Wstrzymało się',c:'ws'}]):[{l:'Za',c:'zs'},{l:'Przeciw',c:'ps'},{l:'Wstrzymało się',c:'ws'}];
+  $('fields').innerHTML=items.map(function(it){return '<label class="'+it.c+'">'+esc(it.l)+'<input type="number" min="0" class="vin" value="0" oninput="remain()"></label>'}).join('');
+  pickParty();$('send').disabled=!cur.open;
+}
+function pickParty(){
+  var pid=$('pSel').value;
+  try{localStorage.setItem('sejm-party',pid)}catch(e){}
+  var p=myParty();
+  $('pinWrap').classList.toggle('hide',!(p&&p.hasPin));
+  Array.prototype.forEach.call(document.querySelectorAll('.vin'),function(i){i.value=0});
+  remain();
+  $('pMsg').textContent=voted.indexOf(pid)>=0?'Głosy Twojej partii zostały już wysłane. Możesz wysłać je ponownie, żeby je nadpisać.':'';$('pMsg').className='msg good';
+}
+async function sendVotes(){
+  var m=$('pMsg'),v=vals(),pl={pid:$('pSel').value,pin:$('pin').value};
+  if(cur.kind==='choice'){pl.c=v.slice(0,-1);pl.w=v[v.length-1]}else{pl.z=v[0];pl.p=v[1];pl.w=v[2]}
+  try{
+    await api('vote',pl);
+    m.textContent='✅ Głosy wysłane (są tajne do czasu publikacji wyników).';m.className='msg good';poll();
+  }catch(e){m.textContent=e.message;m.className='msg err'}
+}
+
+/* ---- wynik ---- */
+function evalVote(){
+  var k=cur.kind==='choice',N=0,cnt=0,W=0,Z=0,P=0,C=k?cur.options.map(function(){return 0}):[];
+  cur.parties.forEach(function(p){
+    var v=votes[p.id];N+=p.s;if(!v)return;cnt++;W+=v.w;
+    if(k)v.c.forEach(function(x,i){C[i]+=x});else{Z+=v.z;P+=v.p}
+  });
+  var cols=k?C:[Z,P],cast=W+sum(cols),quorum=cast>=Math.ceil(N/2),ok=false,need=null,why='',res,verdict;
+  if(!k){
+    if(cur.rule==='simple'){ok=Z>P;need=Math.floor((Z+P)/2)+1;why='Zwykła większość: za ('+Z+') musi być większe niż przeciw ('+P+').'}
+    else if(cur.rule==='abs'){need=Math.floor(N/2)+1;ok=Z>=need;why='Bezwzględna większość: potrzeba co najmniej '+need+' głosów za (ustawowo '+N+' posłów).'}
+    else if(cur.rule==='35'){need=Math.ceil(cast*3/5);ok=cast>0&&Z>=need;why='3/5 głosów oddanych ('+cast+'): potrzeba co najmniej '+need+' za.'}
+    else{need=Math.ceil(cast*2/3);ok=cast>0&&Z>=need;why='2/3 głosów oddanych ('+cast+'): potrzeba co najmniej '+need+' za.'}
+    res=ok?'Przyjęto':'Odrzucono';verdict=ok?'✅ PRZYJĘTO':'❌ ODRZUCONO';
+  }else{
+    var mx=Math.max.apply(null,C),win=[];
+    C.forEach(function(x,i){if(x===mx&&mx>0)win.push(cur.options[i])});
+    if(cur.rule==='abs'){need=Math.floor(N/2)+1;ok=mx>=need;why='Bezwzględna większość: zwycięzca musi dostać co najmniej '+need+' głosów (ustawowo '+N+' posłów).'}
+    else{ok=win.length===1;why='Wygrywa opcja z największą liczbą głosów.'}
+    if(ok){res='Wybrano: '+win[0];verdict='✅ WYBRANO: '+esc(win[0])}
+    else if(win.length>1&&cur.rule!=='abs'){res='Remis: '+win.join(', ');verdict='⚖️ REMIS: '+esc(win.join(', '))}
+    else{res='Nikt nie wybrany';verdict='❌ NIKT NIE WYBRANY'}
+  }
+  if(cast===0){res='Brak głosów';verdict='Brak głosów'}
+  else if(!quorum){res='Brak quorum';verdict='Brak quorum'}
+  return{k:k,N:N,cnt:cnt,W:W,Z:Z,P:P,cols:cols,cast:cast,quorum:quorum,ok:ok,need:need,why:why,res:res,verdict:verdict};
+}
+function renderBoard(e){
+  var rows=[['Głosowało',e.cast]];
+  if(e.need!=null)rows.push(['W. ustawowa',e.need]);
+  if(e.k)cur.options.forEach(function(o,i){rows.push([o,e.cols[i]])});else rows.push(['Za',e.Z],['Przeciw',e.P]);
+  rows.push(['Wstrzymało się',e.W]);
+  var b=$('board');b.classList.remove('hide');
+  b.innerHTML='<div class="bt">Głosowanie nr '+cur.num+'</div><div class="bs">'+esc(cur.title)+'</div>'+rows.map(function(r){return '<div class="br"><span>'+esc(r[0])+'</span><span>'+r[1]+'</span></div>'}).join('');
+}
+function renderResults(){
+  if(!cur){['thead','rows','tot','verdict','nums','bar','detail'].forEach(function(i){$(i).innerHTML=''});$('board').classList.add('hide');return}
+  if(!(cur.published||pass)){renderHidden();return}
+  var e=evalVote(),k=e.k,N=e.N,html='';
+  $('thead').innerHTML='<tr><th>Partia</th><th>Posłów</th>'+(k?cur.options.map(function(o){return '<th>'+esc(o)+'</th>'}).join(''):'<th class="zs">Za</th><th class="ps">Przeciw</th>')+'<th class="ws">Wstrz.</th><th>Nieobecni</th></tr>';
+  var nc=k?cur.options.length:2;
+  cur.parties.forEach(function(p){
+    var v=votes[p.id];
+    if(v){var cells=k?v.c:[v.z,v.p];
+      html+='<tr><td>'+esc(p.n)+'</td><td>'+p.s+'</td>'+cells.map(function(x,i){return '<td class="'+(k?'':i?'ps':'zs')+'">'+x+'</td>'}).join('')+'<td class="ws">'+v.w+'</td><td>'+(p.s-sum(cells)-v.w)+'</td></tr>'}
+    else html+='<tr><td>'+esc(p.n)+'</td><td>'+p.s+'</td><td colspan="'+(nc+2)+'" class="mut">brak głosów</td></tr>';
+  });
+  $('rows').innerHTML=html;
+  var absent=N-e.cast;
+  $('tot').innerHTML='<td>Razem</td><td>'+N+'</td>'+e.cols.map(function(x,i){return '<td class="'+(k?'':i?'ps':'zs')+'">'+x+'</td>'}).join('')+'<td class="ws">'+e.W+'</td><td>'+absent+'</td>';
+  var v=$('verdict'),pre=cur.published?'':'Podgląd (widzisz tylko Ty): ';
+  v.innerHTML=pre+e.verdict;
+  v.style.color=e.cast===0?'var(--mut)':!e.quorum?'var(--ab)':e.ok?'var(--ok)':'var(--no)';
+  renderBoard(e);
+  $('nums').innerHTML=(k?cur.options.map(function(o,i){return '<span><b>'+e.cols[i]+'</b> '+esc(o)+'</span>'}).join(''):'<span class="zs"><b>'+e.Z+'</b> za</span><span class="ps"><b>'+e.P+'</b> przeciw</span>')+'<span class="ws"><b>'+e.W+'</b> wstrzymało</span><span><b>'+Math.max(absent,0)+'</b> nieobecnych</span>';
+  var t=Math.max(N,1);
+  $('bar').innerHTML=k?'':'<div style="width:'+e.Z/t*100+'%;background:var(--ok)"></div><div style="width:'+e.P/t*100+'%;background:var(--no)"></div><div style="width:'+e.W/t*100+'%;background:var(--ab)"></div>';
+  $('detail').textContent='Zagłosowało '+e.cnt+' z '+cur.parties.length+' partii. '+e.why+(e.quorum||e.cast===0?'':' Obecnych '+e.cast+' z '+N+', wymagane co najmniej '+Math.ceil(N/2)+'.');
+}
+function renderHidden(){
+  $('board').classList.add('hide');
+  $('thead').innerHTML='<tr><th>Partia</th><th>Posłów</th><th>Status</th></tr>';
+  var cnt=0;
+  $('rows').innerHTML=cur.parties.map(function(p){
+    var d=voted.indexOf(p.id)>=0;if(d)cnt++;
+    return '<tr><td>'+esc(p.n)+'</td><td>'+p.s+'</td><td class="'+(d?'good':'mut')+'">'+(d?'✅ zagłosowała':'czeka na głosy…')+'</td></tr>'}).join('');
+  $('tot').innerHTML='';$('nums').innerHTML='';$('bar').innerHTML='';
+  var v=$('verdict');v.textContent='🔒 Głosowanie tajne';v.style.color='var(--mut)';
+  $('detail').textContent='Zagłosowało '+cnt+' z '+cur.parties.length+' partii. Wyniki pojawią się, gdy marszałek je opublikuje.';
+}
+
+/* ---- panel marszałka ---- */
+var RULES={yn:[['simple','Zwykła (więcej za niż przeciw)'],['abs','Bezwzględna (> połowy ustawowej liczby posłów)'],['35','3/5 głosów'],['23','2/3 głosów']],choice:[['plur','Najwięcej głosów wygrywa'],['abs','Bezwzględna (> połowy ustawowej liczby posłów)']]};
+
+function kindChange(sel){
+  var k = $('mKind').value;
+  $('mOptsWrap').classList.toggle('hide', k !== 'choice');
+
+  $('mRule').innerHTML = RULES[k].map(function(r){
+    return '<option value="' + r[0] + '">' + r[1] + '</option>';
+  }).join('');
+
+  if (sel) {
+    $('mRule').value = sel;
+  }
+}
+
+// Wypełnij listę większości od razu po załadowaniu strony.
+kindChange();
+
+
+
+$('admLink').addEventListener('click', async function(ev) {
+  ev.preventDefault();
+
+  if (pass) {
+    $('mBox').classList.toggle('hide');
+    return;
+  }
+
+  $('loginBox').classList.remove('hide');
+  $('loginEmail').focus();
 });
 
-async function sha256(value: string) {
-  const bytes = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+$('cancelLogin').addEventListener('click', function() {
+  $('loginBox').classList.add('hide');
+  $('loginMsg').textContent = '';
+  $('loginForm').reset();
+});
 
+$('loginForm').addEventListener('submit', async function(ev) {
+  ev.preventDefault();
 
-function safeParty(p: any) {
-  return {
-    id: p.id ?? p.party_id,
-    n: p.name ?? p.party_name,
-    s: Number(p.seats),
-    hasPin: Boolean(p.pin_hash),
-  };
-}
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
 
+  $('loginMsg').textContent = 'Logowanie…';
+  $('loginMsg').className = 'msg';
 
-async function getSession() {
-  const { data, error } = await admin
-    .from("voting_sessions")
-    .select("*")
-    .order("vote_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
-}
-
-async function getControl() {
-  const { data, error } = await admin
-    .from("app_control")
-    .select("*")
-    .eq("id", true)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (data) return data;
-
-  const { data: inserted, error: insertError } = await admin
-    .from("app_control")
-    .insert({ id: true })
-    .select("*")
-    .single();
-
-  if (insertError) throw insertError;
-  return inserted;
-}
-
-async function setSound(type: string) {
-  const c = await getControl();
-
-  const { data, error } = await admin
-    .from("app_control")
-    .update({
-      sound_seq: Number(c.sound_seq || 0) + 1,
-      sound_type: type,
-      sound_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", true)
-    .select("sound_seq")
-    .single();
-
-  if (error) throw error;
-  return data.sound_seq;
-}
-
-async function maybeClose(session: any, control: any) {
-  if (
-    session?.status === "open" &&
-    control?.closing_at &&
-    new Date(control.closing_at).getTime() <= Date.now()
-  ) {
-    const { error } = await admin
-      .from("voting_sessions")
-      .update({
-        status: "closed",
-        closed_at: new Date().toISOString(),
-      })
-      .eq("id", session.id)
-      .eq("status", "open");
+  try {
+    const { error } = await sb.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
 
     if (error) throw error;
 
-    await admin
-      .from("app_control")
-      .update({
-        closing_at: null,
-        updated_at: new Date().toISOString(),
+    const result = await api('admin_state');
+
+    pass = 'authenticated';
+    cur = result.cur || null;
+    votes = result.votes || {};
+    voted = result.voted || [];
+
+    draft = {
+      parties: (result.parties || []).map(function(p) {
+        return {
+          id: p.id,
+          n: p.n,
+          s: Number(p.s),
+          pin: '',
+          hasPin: p.hasPin,
+          clearPin: false
+        };
       })
-      .eq("id", true);
-
-    if (control.auto_sound) await setSound("vend");
-
-    session.status = "closed";
-    control.closing_at = null;
-  }
-
-  return { session, control };
-}
-
-async function loadState(isAdmin: boolean) {
-  let session = await getSession();
-  let control = await getControl();
-
-  ({ session, control } = await maybeClose(session, control));
-
-  if (!session) {
-    return {
-      cur: null,
-      votes: {},
-      voted: [],
-      seq: Number(control.sound_seq || 0),
-      soundType: control.sound_type,
-      soundAge: 999,
-      closing: control.closing_at
-        ? { at: control.closing_at }
-        : null,
     };
+
+    lastKey = '';
+    $('loginBox').classList.add('hide');
+    $('mBox').classList.remove('hide');
+
+    renderDraft();
+    renderAll();
+
+    $('loginMsg').textContent = '';
+    $('loginForm').reset();
+    $('mBox').scrollIntoView({ behavior: 'smooth' });
+  } catch (error) {
+    $('loginMsg').textContent =
+      'Nie udało się zalogować: ' + error.message;
+    $('loginMsg').className = 'msg err';
   }
+});
 
-  const { data: sp, error: spErr } = await admin
-    .from("session_parties")
-    .select("party_id,party_name,seats")
-    .eq("session_id", session.id);
+async function checkSession() {
+  const { data, error } = await sb.auth.getSession();
 
-  if (spErr) throw spErr;
-
-  const parties = (sp || []).map(safeParty);
-
-  // Dane o PIN-ach pochodzą z aktualnej tabeli partii.
-  // Przed publikacją wyników anonimowi użytkownicy nie otrzymują liczby głosów.
-  const ids = parties.map((p: any) => p.id);
-
-  if (ids.length) {
-    const { data: live, error: liveErr } = await admin
-      .from("parties")
-      .select("id,pin_hash")
-      .in("id", ids);
-
-    if (liveErr) throw liveErr;
-
-    const pinMap = new Map(
-      (live || []).map((p: any) => [p.id, Boolean(p.pin_hash)]),
-    );
-
-    parties.forEach(
-      (p: any) => (p.hasPin = pinMap.get(p.id) || false),
-    );
-  }
-
-  const { data: rows, error: voteErr } = await admin
-    .from("votes")
-    .select("*")
-    .eq("session_id", session.id);
-
-  if (voteErr) throw voteErr;
-
-  const votes: Record<string, any> = {};
-  const voted = (rows || []).map((r: any) => r.party_id);
-
-  if (isAdmin || session.status === "published") {
-    for (const r of rows || []) {
-      votes[r.party_id] = {
-        z: r.yes_votes,
-        p: r.no_votes,
-        w: r.abstain_votes,
-        c: r.choice_votes || [],
-      };
-    }
-  }
-
-  const age = control.sound_at
-    ? Math.max(
-        0,
-        (Date.now() - new Date(control.sound_at).getTime()) / 1000,
-      )
-    : 999;
-
-  return {
-    cur: {
-      id: session.id,
-      num: session.vote_number,
-      title: session.title,
-      kind: session.kind,
-      options: session.options || [],
-      rule: session.rule,
-      open: session.status === "open",
-      published: session.status === "published",
-      parties,
-    },
-    votes,
-    voted,
-    seq: Number(control.sound_seq || 0),
-    soundType: control.sound_type,
-    soundAge: age,
-    closing: control.closing_at
-      ? { at: control.closing_at }
-      : null,
-  };
-}
-
-async function authenticate(req: Request) {
-  const header = req.headers.get("Authorization") || "";
-  const token = header.replace(/^Bearer\s+/i, "");
-
-  if (!token) return null;
-
-  const client = createClient(url, anon, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  });
-
-  const { data, error } = await client.auth.getUser(token);
-
-  if (error || !data.user) return null;
-  return data.user;
-}
-
-async function requireAdmin(req: Request) {
-  const user = await authenticate(req);
-
-  if (!user) {
-    throw new Error("Zaloguj się na konto marszałka.");
-  }
-
-  const { data, error } = await admin
-    .from("admin_users")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (error) throw error;
-
-  if (!data) {
-    throw new Error("To konto nie ma uprawnień marszałka.");
-  }
-
-  return user;
-}
-
-async function history() {
-  const { data, error } = await admin
-    .from("voting_sessions")
-    .select(
-      "vote_number,title,kind,rule,options,result,published_at",
-    )
-    .eq("status", "published")
-    .order("vote_number", { ascending: false });
-
-  if (error) throw error;
-
-  return (data || []).map((s: any) => {
-    const r = s.result || {};
-
-    const lines = [
-      `GŁOSOWANIE NR ${s.vote_number}`,
-      s.title,
-      `Opublikowano: ${s.published_at || ""}`,
-      `Rodzaj: ${s.kind === "choice" ? "wybór" : "za / przeciw"}`,
-      `Większość: ${s.rule}`,
-      `Wynik: ${r.res || "brak danych"}`,
-      `Głosowało: ${r.cast ?? "—"}; za: ${r.Z ?? "—"}; przeciw: ${
-        r.P ?? "—"
-      }; wstrzymało się: ${r.W ?? "—"}`,
-      s.options?.length
-        ? `Opcje: ${s.options.join(", ")}`
-        : "",
-    ].filter(Boolean);
-
-    return { text: lines.join("\n") };
-  });
-}
-
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: cors });
-  }
-
-  if (req.method !== "POST") {
-    return fail("Użyj metody POST.", 405);
+  if (error || !data.session) {
+    pass = '';
+    $('mBox').classList.add('hide');
+    return;
   }
 
   try {
-    if (!url || !anon || !serviceKey) {
-      return fail(
-        "Brak konfiguracji sekretów Supabase dla funkcji.",
-        500,
-      );
-    }
+    const result = await api('admin_state');
 
-    const body = await req.json().catch(() => ({}));
-    const action = String(body.action || "");
+    pass = 'authenticated';
+    cur = result.cur || null;
+    votes = result.votes || {};
+    voted = result.voted || [];
 
-    if (action === "state") {
-      return json(await loadState(false));
-    }
-
-    if (action === "history") {
-      return json({ items: await history() });
-    }
-
-    if (action === "tick") {
-      const c = await getControl();
-
-      const age = c.sound_at
-        ? Math.max(
-            0,
-            (Date.now() - new Date(c.sound_at).getTime()) / 1000,
-          )
-        : 999;
-
-      return json({
-        seq: Number(c.sound_seq || 0),
-        type: c.sound_type,
-        age,
-        auto: c.auto_sound,
-        closing: c.closing_at
-          ? {
-              at: c.closing_at,
-              remain: Math.max(
-                0,
-                (new Date(c.closing_at).getTime() - Date.now()) / 1000,
-              ),
-            }
-          : null,
-      });
-    }
-
-    if (action === "vote") {
-      const session = await getSession();
-
-      if (!session || session.status !== "open") {
-        return fail("Głosowanie jest zamknięte.", 409);
-      }
-
-      const pid = String(body.pid || "");
-
-      const { data: party, error: partyErr } = await admin
-        .from("parties")
-        .select("*")
-        .eq("id", pid)
-        .eq("active", true)
-        .maybeSingle();
-
-      if (partyErr) throw partyErr;
-
-      if (!party) {
-        return fail("Nie znaleziono aktywnej partii.");
-      }
-
-      const { data: sp, error: spErr } = await admin
-        .from("session_parties")
-        .select("seats")
-        .eq("session_id", session.id)
-        .eq("party_id", pid)
-        .maybeSingle();
-
-      if (spErr) throw spErr;
-
-      if (!sp) {
-        return fail("Ta partia nie bierze udziału w bieżącym głosowaniu.");
-      }
-
-      if (party.pin_hash) {
-        const pin = String(body.pin || "");
-
-        if (!pin) {
-          return fail("Wpisz PIN partii.", 401);
-        }
-
-        const candidate = await sha256(
-          `${party.pin_salt}:${pin}`,
-        );
-
-        if (candidate !== party.pin_hash) {
-          return fail("Nieprawidłowy PIN partii.", 401);
-        }
-      }
-
-      const seats = Number(sp.seats);
-      const kind = session.kind;
-
-      let yes = 0;
-      let no = 0;
-      let abstain = 0;
-      let choices: number[] = [];
-
-      if (kind === "choice") {
-        choices = Array.isArray(body.c)
-          ? body.c.map((x: any) => Number(x))
-          : [];
-
-        abstain = Number(body.w);
-
-        if (choices.length !== (session.options || []).length) {
-          return fail("Nieprawidłowa liczba opcji.");
-        }
-      } else {
-        yes = Number(body.z);
-        no = Number(body.p);
-        abstain = Number(body.w);
-      }
-
-      const all = [
-        ...(kind === "choice" ? choices : [yes, no]),
-        abstain,
-      ];
-
-      if (
-        all.some((x) => !Number.isInteger(x) || x < 0)
-      ) {
-        return fail(
-          "Liczby głosów muszą być nieujemnymi liczbami całkowitymi.",
-        );
-      }
-
-      if (all.reduce((a, b) => a + b, 0) !== seats) {
-        return fail(`Rozdziel dokładnie ${seats} głosów.`);
-      }
-
-      const { error } = await admin
-        .from("votes")
-        .upsert(
-          {
-            session_id: session.id,
-            party_id: pid,
-            yes_votes: yes,
-            no_votes: no,
-            abstain_votes: abstain,
-            choice_votes: choices,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "session_id,party_id" },
-        );
-
-      if (error) throw error;
-      return json({ ok: true });
-    }
-
-    // Wszystkie pozostałe operacje wymagają zalogowanego marszałka
-    // znajdującego się w public.admin_users.
-    await requireAdmin(req);
-
-    if (action === "admin_state") {
-      const state = await loadState(true);
-
-      const { data: parties, error } = await admin
-        .from("parties")
-        .select("id,name,seats,pin_hash,active,sort_order")
-        .eq("active", true)
-        .order("sort_order")
-        .order("name");
-
-      if (error) throw error;
-
-      const c = await getControl();
-
-      return json({
-        ...state,
-        parties: (parties || []).map((p: any) => ({
+    draft = {
+      parties: (result.parties || []).map(function(p) {
+        return {
           id: p.id,
-          n: p.name,
-          s: p.seats,
-          hasPin: Boolean(p.pin_hash),
-          active: p.active,
-        })),
-        autoSound: c.auto_sound,
-      });
-    }
-
-    if (action === "save_parties") {
-      if (!Array.isArray(body.parties)) {
-        return fail("Brak listy partii.");
-      }
-
-      const incoming = body.parties;
-
-      if (incoming.length > 100) {
-        return fail("Zbyt wiele partii.");
-      }
-
-      const clean = incoming.map((p: any, i: number) => ({
-        id:
-          p.id && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(p.id)
-            ? p.id
-            : crypto.randomUUID(),
-        name: String(p.n || "").trim().slice(0, 160),
-        seats: Number(p.s),
-        sort_order: i,
-        pin: String(p.pin || ""),
-        clearPin: Boolean(p.clearPin),
-      }));
-
-      if (
-        clean.some(
-          (p: any) =>
-            !p.name ||
-            !Number.isInteger(p.seats) ||
-            p.seats < 0,
-        )
-      ) {
-        return fail(
-          "Każda partia musi mieć nazwę i nieujemną liczbę posłów.",
-        );
-      }
-
-      const { data: old, error: oldErr } = await admin
-        .from("parties")
-        .select("id");
-
-      if (oldErr) throw oldErr;
-
-      const incomingIds = new Set(clean.map((p: any) => p.id));
-
-      for (const p of clean) {
-        const { data: existing, error: findErr } = await admin
-          .from("parties")
-          .select("pin_salt,pin_hash")
-          .eq("id", p.id)
-          .maybeSingle();
-
-        if (findErr) throw findErr;
-
-        let pin_salt = existing?.pin_salt || crypto.randomUUID();
-        let pin_hash = existing?.pin_hash || "";
-
-        if (p.clearPin) {
-          pin_salt = crypto.randomUUID();
-          pin_hash = "";
-        } else if (p.pin) {
-          pin_salt = crypto.randomUUID();
-          pin_hash = await sha256(`${pin_salt}:${p.pin}`);
-        }
-
-        const payload: any = {
-          id: p.id,
-          name: p.name,
-          seats: p.seats,
-          sort_order: p.sort_order,
-          active: true,
-          pin_salt,
-          pin_hash,
+          n: p.n,
+          s: Number(p.s),
+          pin: '',
+          hasPin: p.hasPin,
+          clearPin: false
         };
-
-        const { error } = await admin
-          .from("parties")
-          .upsert(payload, { onConflict: "id" });
-
-        if (error) throw error;
-      }
-
-      // Pominięte partie są archiwizowane, a nie usuwane,
-      // dzięki czemu zachowane zostają powiązania z historią głosowań.
-      for (const p of old || []) {
-        if (!incomingIds.has(p.id)) {
-          const { error } = await admin
-            .from("parties")
-            .update({ active: false })
-            .eq("id", p.id);
-
-          if (error) throw error;
-        }
-      }
-
-      return json({ ok: true });
-    }
-
-    if (action === "start") {
-      const title = String(body.title || "").trim().slice(0, 250);
-      const kind = body.kind === "choice" ? "choice" : "yn";
-      const rule = String(body.rule || "");
-
-      const options =
-        kind === "choice" && Array.isArray(body.options)
-          ? body.options
-              .map((x: any) => String(x).trim())
-              .filter(Boolean)
-          : [];
-
-      if (!title) {
-        return fail("Podaj nazwę głosowania.");
-      }
-
-      if (
-        kind === "yn" &&
-        !["simple", "abs", "35", "23"].includes(rule)
-      ) {
-        return fail("Nieprawidłowa większość.");
-      }
-
-      if (
-        kind === "choice" &&
-        !["plur", "abs"].includes(rule)
-      ) {
-        return fail("Nieprawidłowa większość.");
-      }
-
-      if (
-        kind === "choice" &&
-        (
-          options.length < 2 ||
-          options.length > 10 ||
-          new Set(options).size !== options.length
-        )
-      ) {
-        return fail(
-          "Wybór musi mieć od 2 do 10 różnych opcji.",
-        );
-      }
-
-      const { data: parties, error: pErr } = await admin
-        .from("parties")
-        .select("id,name,seats")
-        .eq("active", true)
-        .order("sort_order");
-
-      if (pErr) throw pErr;
-
-      if (!parties?.length) {
-        return fail("Najpierw dodaj co najmniej jedną partię.");
-      }
-
-      const { data: latest } = await admin
-        .from("voting_sessions")
-        .select("vote_number")
-        .order("vote_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const { data: session, error } = await admin
-        .from("voting_sessions")
-        .insert({
-          vote_number: Number(latest?.vote_number || 0) + 1,
-          title,
-          kind,
-          rule,
-          options,
-          status: "open",
-          created_by: (await authenticate(req))?.id || null,
-        })
-        .select("*")
-        .single();
-
-      if (error) throw error;
-
-      const snapshots = parties.map((p: any) => ({
-        session_id: session.id,
-        party_id: p.id,
-        party_name: p.name,
-        seats: p.seats,
-      }));
-
-      const { error: spErr } = await admin
-        .from("session_parties")
-        .insert(snapshots);
-
-      if (spErr) throw spErr;
-
-      const { error: clearErr } = await admin
-        .from("app_control")
-        .update({
-          closing_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", true);
-
-      if (clearErr) throw clearErr;
-
-      const c = await getControl();
-      if (c.auto_sound) await setSound("vstart");
-
-      return json({ ok: true, id: session.id });
-    }
-
-    if (action === "toggle") {
-      const s = await getSession();
-
-      if (!s) return fail("Brak głosowania.");
-
-      if (s.status === "published") {
-        return fail(
-          "Opublikowanego głosowania nie można ponownie otworzyć.",
-        );
-      }
-
-      const open = s.status !== "open";
-
-      const { error } = await admin
-        .from("voting_sessions")
-        .update({
-          status: open ? "open" : "closed",
-          closed_at: open ? null : new Date().toISOString(),
-        })
-        .eq("id", s.id);
-
-      if (error) throw error;
-
-      const c = await getControl();
-
-      await admin
-        .from("app_control")
-        .update({ closing_at: null })
-        .eq("id", true);
-
-      if (c.auto_sound) {
-        await setSound(open ? "vstart" : "vend");
-      }
-
-      return json({ ok: true });
-    }
-
-    if (action === "publish") {
-      const s = await getSession();
-
-      if (!s) return fail("Brak głosowania.");
-
-      if (s.status === "published") {
-        return fail("Wyniki są już opublikowane.");
-      }
-
-      const { data: rows, error: vErr } = await admin
-        .from("votes")
-        .select("*")
-        .eq("session_id", s.id);
-
-      if (vErr) throw vErr;
-
-      const { data: sp, error: spErr } = await admin
-        .from("session_parties")
-        .select("seats")
-        .eq("session_id", s.id);
-
-      if (spErr) throw spErr;
-
-      const N = (sp || []).reduce(
-        (a: number, p: any) => a + Number(p.seats),
-        0,
-      );
-
-      
-      let Z = 0;
-      let P = 0;
-      let W = 0;
-      const C = (s.options || []).map(() => 0);
-
-      for (const r of rows || []) {
-        Z += Number(r.yes_votes || 0);
-        P += Number(r.no_votes || 0);
-        W += Number(r.abstain_votes || 0);
-
-        (r.choice_votes || []).forEach(
-          (x: number, i: number) => {
-            if (i < C.length) C[i] += Number(x || 0);
-          },
-        );
-      }
-
-      // Liczba oddanych głosów.
-      const cast = Z + P + W + C.reduce(
-        (a: number, b: number) => a + b,
-        0,
-      );
-
-      const rule = String(s.rule || "simple");
-
-      let res = "";
-      let need: number | null = null;
-      let winner: number | null = null;
-
-      if (s.kind === "choice") {
-        const maxVotes = Math.max(0, ...C);
-        const winners = C
-          .map((votes: number, i: number) => ({ votes, i }))
-          .filter((x: any) => x.votes === maxVotes);
-
-        if (maxVotes > 0 && winners.length === 1) {
-          winner = winners[0].i;
-
-          if (
-            rule === "plur" ||
-            (rule === "abs" && maxVotes > cast / 2)
-          ) {
-            res = `Wybrano: ${s.options[winner]}`;
-          } else {
-            res = "Nie osiągnięto wymaganej większości";
-          }
-        } else {
-          res = "Remis — brak rozstrzygnięcia";
-        }
-
-        if (rule === "abs") {
-          need = Math.floor(cast / 2) + 1;
-        }
-      } else {
-        switch (rule) {
-          case "simple":
-            need = P + 1;
-            res = Z > P
-              ? "Wniosek przyjęty"
-              : "Wniosek odrzucony";
-            break;
-
-          case "abs":
-            need = P + W + 1;
-            res = Z > P + W
-              ? "Wniosek przyjęty"
-              : "Wniosek odrzucony";
-            break;
-
-          case "35":
-            need = Math.ceil(cast * 3 / 5);
-            res = Z >= need && cast > 0
-              ? "Wniosek przyjęty"
-              : "Wniosek odrzucony";
-            break;
-
-          case "23":
-            need = Math.ceil(cast * 2 / 3);
-            res = Z >= need && cast > 0
-              ? "Wniosek przyjęty"
-              : "Wniosek odrzucony";
-            break;
-
-          default:
-            return fail("Nieznana reguła większości.");
-        }
-      }
-
-      const result = {
-        Z,
-        P,
-        W,
-        C,
-        cast,
-        N,
-        absent: Math.max(0, N - cast),
-        res,
-        need,
-        rule,
-        winner,
-      };
-
-
-      const { error } = await admin
-        .from("voting_sessions")
-        .update({
-          status: "published",
-          closed_at: new Date().toISOString(),
-          published_at: new Date().toISOString(),
-          result,
-        })
-        .eq("id", s.id);
-
-      if (error) throw error;
-
-      await admin
-        .from("app_control")
-        .update({ closing_at: null })
-        .eq("id", true);
-
-      const c = await getControl();
-      if (c.auto_sound) await setSound("vend");
-
-      return json({ ok: true });
-    }
-
-    if (action === "sound") {
-      const type = String(body.type || "");
-
-      if (
-        ![
-          "gavel",
-          "bell",
-          "timer",
-          "call",
-          "vstart",
-          "vend",
-          "tick",
-        ].includes(type)
-      ) {
-        return fail("Nieznany dźwięk.");
-      }
-
-      return json({ seq: await setSound(type) });
-    }
-
-    if (action === "snd_auto") {
-      if (typeof body.on !== "boolean") {
-        return fail("Nieprawidłowa wartość.");
-      }
-
-      const { error } = await admin
-        .from("app_control")
-        .update({
-          auto_sound: body.on,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", true);
-
-      if (error) throw error;
-      return json({ ok: true });
-    }
-
-    if (action === "close_in") {
-      const secs = Number(body.secs);
-
-      if (
-        !Number.isInteger(secs) ||
-        secs < 3 ||
-        secs > 300
-      ) {
-        return fail(
-          "Odliczanie musi mieć 3–300 sekund.",
-        );
-      }
-
-      const s = await getSession();
-
-      if (!s || s.status !== "open") {
-        return fail("Głosowanie nie jest otwarte.");
-      }
-
-      const at = new Date(
-        Date.now() + secs * 1000,
-      ).toISOString();
-
-      const { error } = await admin
-        .from("app_control")
-        .update({
-          closing_at: at,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", true);
-
-      if (error) throw error;
-      return json({ ok: true, at });
-    }
-
-    if (action === "close_cancel") {
-      const { error } = await admin
-        .from("app_control")
-        .update({
-          closing_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", true);
-
-      if (error) throw error;
-      return json({ ok: true });
-    }
-
-    return fail("Nieznana operacja.");
-  } catch (e) {
-    const message =
-      e instanceof Error
-        ? e.message
-        : "Wewnętrzny błąd serwera.";
-
-    return fail(
-      message,
-      message.includes("Zaloguj") ||
-        message.includes("uprawnień")
-        ? 401
-        : 500,
-    );
+      })
+    };
+
+    $('loginBox').classList.add('hide');
+    $('mBox').classList.remove('hide');
+    renderDraft();
+    renderAll();
+  } catch (error) {
+    pass = '';
+    $('mBox').classList.add('hide');
   }
+}
+
+
+function renderDraft(){
+  $('mParties').innerHTML=draft.parties.map(function(p,i){return '<div class="row" style="margin-bottom:6px">'+
+   '<input style="flex:1;min-width:130px" placeholder="Nazwa" value="'+esc(p.n)+'" oninput="draft.parties['+i+'].n=this.value">'+
+   '<input type="number" min="0" title="Liczba posłów" value="'+p.s+'" oninput="draft.parties['+i+'].s=num(this.value)">'+
+   '<input style="width:100px" placeholder="PIN" value="'+esc(p.pin)+'" oninput="draft.parties['+i+'].pin=this.value">'+
+   '<button class="sm" onclick="mDel('+i+')">✕</button></div>'}).join('');
+}
+function mAdd(){draft.parties.push({id:rid(),n:'Nowa partia',s:10,pin:''});renderDraft()}
+function mDel(i){draft.parties.splice(i,1);renderDraft()}
+function say(t,ok){var m=$('mMsg');m.textContent=t;m.className='msg '+(ok?'good':'err')}
+async function mSave(){
+  try{await api('save_parties',{pass:pass,parties:draft.parties});say('✅ Partie zapisane.',true);lastKey='';poll()}
+  catch(e){say(e.message,false)}
+}
+async function mStart(){
+  if(cur&&!confirm('Rozpocząć nowe głosowanie? Obecne głosy zostaną skasowane.'))return;
+  var opts=$('mOpts').value.split('\n').map(function(s){return s.trim()}).filter(Boolean);
+  try{await api('start',{pass:pass,title:$('mTitle').value,kind:$('mKind').value,options:opts,rule:$('mRule').value,parties:draft.parties});say('✅ Głosowanie rozpoczęte.',true);lastKey='';poll()}
+  catch(e){say(e.message,false)}
+}
+async function mToggle(){
+  try{await api('toggle',{pass:pass});poll()}catch(e){say(e.message,false)}
+}
+async function mPublish(){
+  if(!confirm('Zamknąć głosowanie, pokazać wyniki wszystkim i zapisać w historii?'))return;
+  var e=evalVote();
+  try{await api('publish',{pass:pass,result:e.res,need:e.need});say('✅ Wyniki opublikowane i zapisane w historii.',true);poll()}catch(x){say(x.message,false)}
+}
+
+checkSession().then(function() {
+  poll();
 });
+
+setInterval(poll, 3000);
+
+/* ---- dźwięki sali obrad ---- */
+var AC=null,MASTER=null,sndOn=true,vol=0.7,lastSeq=null,clo=null;
+try{
+  if(localStorage.getItem('sejm-snd')==='0')sndOn=false;
+  var vv=localStorage.getItem('sejm-vol');if(vv!==null&&!isNaN(parseFloat(vv)))vol=Math.min(1,Math.max(0,parseFloat(vv)));
+}catch(e){}
+var GEST=['pointerdown','touchstart','keydown','click'];
+function unlock(){if(sndOn)audio()}
+function dropUnlock(){GEST.forEach(function(ev){document.removeEventListener(ev,unlock,true)})}
+GEST.forEach(function(ev){document.addEventListener(ev,unlock,true)});
+function running(){return !!AC&&AC.state==='running'}
+function audio(){
+  if(!AC){
+    var C=window.AudioContext||window.webkitAudioContext;if(!C)return null;
+    AC=new C();var comp=AC.createDynamicsCompressor();MASTER=AC.createGain();MASTER.gain.value=vol;MASTER.connect(comp);comp.connect(AC.destination);
+    AC.onstatechange=sndLabel;
+  }
+  if(AC.state==='suspended')AC.resume();
+  return AC;
+}
+function oscTone(t,f,dur,type,peak){
+  var o=AC.createOscillator(),g=AC.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+0.01);
+  g.gain.setValueAtTime(peak,t+Math.max(0.02,dur-0.04));g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g);g.connect(MASTER);o.start(t);o.stop(t+dur+0.05);
+}
+function noiseBuf(d){
+  var n=Math.floor(AC.sampleRate*d),b=AC.createBuffer(1,n,AC.sampleRate),a=b.getChannelData(0);
+  for(var i=0;i<n;i++)a[i]=Math.random()*2-1;
+  var s=AC.createBufferSource();s.buffer=b;return s;
+}
+function knock(t){ // uderzenie laską o podłogę
+  var o=AC.createOscillator(),g=AC.createGain();o.type='sine';
+  o.frequency.setValueAtTime(190,t);o.frequency.exponentialRampToValueAtTime(55,t+0.2);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(1,t+0.004);g.gain.exponentialRampToValueAtTime(0.0001,t+0.4);
+  o.connect(g);g.connect(MASTER);o.start(t);o.stop(t+0.45);
+  var n=noiseBuf(0.06),f=AC.createBiquadFilter(),g2=AC.createGain();
+  f.type='bandpass';f.frequency.value=1100;f.Q.value=0.7;
+  g2.gain.setValueAtTime(0.7,t);g2.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
+  n.connect(f);f.connect(g2);g2.connect(MASTER);n.start(t);
+}
+function bellHit(t,f0,peak,dec){ // jedno uderzenie w dzwonek (składowe niecałkowite)
+  [[1,1],[2,0.5],[2.76,0.4],[5.4,0.2],[8.93,0.1]].forEach(function(p,i){
+    var o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=f0*p[0];
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak*p[1],t+0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dec/(1+i*0.6));
+    o.connect(g);g.connect(MASTER);o.start(t);o.stop(t+dec+0.05);
+  });
+}
+function elBell(t,dur,f){ // dzwonek elektryczny – szybkie bicie młoteczka
+  var n=Math.round(dur/0.075);
+  for(var i=0;i<n;i++)bellHit(t+i*0.075,f,0.13,0.22);
+}
+function play(type,force){
+  if(!sndOn)return;var c=audio();if(!c)return;
+  if(c.state!=='running'&&!force)return;
+  var t=c.currentTime+0.04;
+  if(type==='gavel'){[0,0.6,1.2].forEach(function(d){knock(t+d)})}
+  else if(type==='bell'){[0,0.12,0.2,0.34,0.42,0.55,0.63,0.78,0.86,1.0].forEach(function(d,k){bellHit(t+d,1380+(k%3)*45,0.16,0.9)})}
+  else if(type==='timer'){elBell(t,1.1,1500)}
+  else if(type==='call'){[0,1.7,3.4].forEach(function(d){elBell(t+d,1.1,1300)})}
+  else if(type==='vstart'){oscTone(t,1000,0.13,'sine',0.35);oscTone(t+0.25,1000,0.13,'sine',0.35)}
+  else if(type==='vend'){oscTone(t,780,0.9,'sine',0.35)}
+  else if(type==='tick'){oscTone(t,1250,0.07,'sine',0.3)}
+}
+function sndLabel(){
+  var txt=!sndOn?'Dźwięk: wyłączony (kliknij, aby włączyć)':running()?'Dźwięk: włączony (kliknij, aby wyłączyć)':'Dźwięk: włączony – kliknij gdziekolwiek na stronie, aby go uruchomić';
+  var b=$('sndBtn');if(b.textContent!==txt)b.textContent=txt;
+  if(running())dropUnlock();
+}
+function sndSave(){try{localStorage.setItem('sejm-snd',sndOn?'1':'0')}catch(e){}}
+function sndToggle(){
+  if(sndOn&&!running()){audio();play('tick',true);sndLabel();return} // to kliknięcie tylko uruchamia dźwięk
+  sndOn=!sndOn;sndSave();
+  if(sndOn){audio();play('tick',true)}
+  sndLabel();
+}
+function sndVolChange(){
+  vol=num($('sndVol').value)/100;if(MASTER)MASTER.gain.value=vol;
+  try{localStorage.setItem('sejm-vol',String(vol))}catch(e){}
+}
+async function sndPoll(){
+  try{
+    var s=await api('tick'),now=performance.now();
+    if(lastSeq===null)lastSeq=s.seq;
+    else if(s.seq>lastSeq){lastSeq=s.seq;if(s.age<=8)play(s.type)}
+    if(s.closing){
+      if(!clo||clo.key!==s.closing.at)clo={key:s.closing.at,dl:0,last:null,fired:false};
+      clo.dl=now+s.closing.remain*1000;
+    }else if(clo&&clo.dl-now>1500)clo=null;
+    if(pass&&document.activeElement!==$('mAuto'))$('mAuto').checked=!!s.auto;
+  }catch(e){}
+}
+function uiTick(){
+  var now=performance.now(),xb=$('closeBox'),q,sc;
+  if(clo){
+    q=(clo.dl-now)/1000;sc=Math.ceil(q);
+    if(q>0&&sc<=5&&sc>=1&&clo.last!==sc){clo.last=sc;play('tick')}
+    if(q<=0&&!clo.fired){clo.fired=true;play('vend')}
+    xb.classList.toggle('hide',q<=0);$('closeSec').textContent=Math.max(sc,0);
+    if(q<-2)clo=null;
+  }else xb.classList.add('hide');
+}
+function sndMsg(t,ok){var m=$('mMsg');m.textContent=t;m.className='msg '+(ok?'good':'err')}
+function sndEnable(){if(!sndOn){sndOn=true;sndSave()}audio();sndLabel()}
+async function snd(t){
+  sndEnable();
+  try{var r=await api('sound',{pass:pass,type:t});lastSeq=r.seq;play(t)}catch(e){sndMsg(e.message,false)}
+}
+async function cIn(){
+  sndEnable();
+  try{await api('close_in',{pass:pass,secs:num($('cSecs').value)});sndPoll()}catch(e){sndMsg(e.message,false)}
+}
+async function cCancel(){try{await api('close_cancel',{pass:pass});clo=null;sndPoll()}catch(e){sndMsg(e.message,false)}}
+async function mAutoSnd(){try{await api('snd_auto',{pass:pass,on:$('mAuto').checked})}catch(e){sndMsg(e.message,false)}}
+
+$('sndVol').value=Math.round(vol*100);sndLabel();
+sndPoll();setInterval(sndPoll,1200);setInterval(uiTick,150);setInterval(sndLabel,1000);
+
+</script>
+</body>
+</html>
