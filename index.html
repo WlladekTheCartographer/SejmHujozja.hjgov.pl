@@ -6,18 +6,18 @@
 <title>Sejm – głosowania</title>
 <style>
 :root{--bg:#f6f4ef;--card:#fff;--tx:#1d1d1b;--mut:#6b6b66;--bd:#ddd9cf;--ac:#b3202a;--ok:#1f7a3d;--no:#b3202a;--ab:#b07a00}
-@media (prefers-color-scheme:dark){:root{--bg:#161615;--card:#222220;--tx:#eeece6;--mut:#a09d94;--bd:#3a3935;--ac:#e0505a;--ok:#4fc27a;--no:#e0505a;--ab:#e0b040;color-scheme:dark}}
+@media(prefers-color-scheme:dark){:root{--bg:#161615;--card:#222220;--tx:#eeece6;--mut:#a09d94;--bd:#3a3935;--ac:#e0505a;--ok:#4fc27a;--no:#e0505a;--ab:#e0b040;color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:860px;margin:0 auto;padding:16px}
+main{max-width:1000px;margin:0 auto;padding:16px}
 h1{font-size:1.5rem;margin:.2em 0 .1em}
 h2{font-size:1.05rem;margin:0 0 10px}
 .sub{color:var(--mut);margin:0 0 16px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:14px}
 .scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse;min-width:420px}
-th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);text-align:left;padding:4px 6px}
-td{padding:5px 6px;border-top:1px solid var(--bd)}
+th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);text-align:left;padding:7px 6px}
+td{padding:7px 6px;border-top:1px solid var(--bd)}
 input,select,button,textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
 input[type=number]{width:80px}
 textarea{width:100%;min-height:90px}
@@ -38,13 +38,13 @@ button.sm{padding:4px 8px;font-size:.8rem}
 .msg{font-size:.92rem;margin:8px 0}
 .remain{font-weight:700;margin:10px 0 2px}
 .err{color:var(--no)}.good{color:var(--ok)}
-.badge{display:inline-block;font-size:.75rem;padding:2px 8px;border-radius:99px;border:1px solid var(--bd)}
-.hide{display:none}
+.badge{display:inline-block;font-size:.75rem;padding:2px 8px;border-radius:99px;border:1px solid var(--bd);margin:2px}
+.hide{display:none!important}
 a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline}
 .board{background:#fff;color:#111;font-family:"Times New Roman",Times,serif;font-weight:700;text-transform:uppercase;border-radius:8px;padding:16px 22px;margin:10px 0 14px;border:1px solid var(--bd)}
 .board .bt{text-align:center;font-size:clamp(1.3rem,5vw,2.1rem)}
 .board .bs{text-align:center;font-weight:400;text-transform:none;font-size:.95rem;color:#555;margin-bottom:8px}
-.board .br{display:flex;justify-content:space-between;gap:14px;font-size:clamp(1.3rem,5.5vw,2.5rem);line-height:1.3}
+.board .br{display:flex;justify-content:space-between;gap:14px;font-size:clamp(1.1rem,5vw,2.1rem);line-height:1.4}
 .sndbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}
 .sndbar input[type=range]{width:110px;padding:0}
 .closing{background:var(--card);border:1px solid var(--ab);border-radius:12px;padding:10px 14px;margin-bottom:14px}
@@ -63,6 +63,23 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
 
 <section class="card" id="info"></section>
 
+<!-- DODANA SEKCJA WYNIKÓW -->
+<section class="card" id="resultsBox">
+  <h2>Wyniki głosowania</h2>
+  <div id="board" class="board hide"></div>
+  <div id="verdict" class="verdict" aria-live="polite">Oczekiwanie na głosowanie</div>
+  <div id="nums" class="nums"></div>
+  <div id="bar" class="bar"></div>
+  <p id="detail" class="note"></p>
+  <div class="scroll">
+    <table>
+      <thead id="thead"></thead>
+      <tbody id="rows"></tbody>
+      <tfoot><tr class="tot" id="tot"></tr></tfoot>
+    </table>
+  </div>
+</section>
+
 <section class="card hide" id="playerBox">
   <h2>Twoje głosy</h2>
   <div class="row">
@@ -76,40 +93,18 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
   <div class="note">Możesz wysłać głosy ponownie (nadpiszą poprzednie), dopóki marszałek nie zamknie głosowania.</div>
 </section>
 
-
 <section class="card hide" id="loginBox">
   <h2>Logowanie marszałka</h2>
-
   <form id="loginForm">
     <div class="row">
-      <label class="wide">
-        E-mail
-        <input
-          id="loginEmail"
-          type="email"
-          autocomplete="username"
-          required
-        >
-      </label>
-
-      <label class="wide">
-        Hasło
-        <input
-          id="loginPassword"
-          type="password"
-          autocomplete="current-password"
-          required
-        >
-      </label>
-
+      <label>E-mail<input id="loginEmail" type="email" autocomplete="username" required></label>
+      <label>Hasło<input id="loginPassword" type="password" autocomplete="current-password" required></label>
       <button class="pri" type="submit">Zaloguj</button>
       <button type="button" id="cancelLogin">Anuluj</button>
     </div>
   </form>
-
   <div class="msg" id="loginMsg" role="status"></div>
 </section>
-
 
 <section class="card hide" id="mBox">
   <h2>Panel marszałka</h2>
@@ -122,11 +117,7 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
   <h2 style="margin-top:18px">2. Głosowanie</h2>
   <div class="row">
     <label style="flex:1;min-width:200px">Nazwa ustawy / uchwały / wyboru<input id="mTitle" placeholder="np. Wybór ministra obrony"></label>
-    <label>Rodzaj
-      <select id="mKind" onchange="kindChange()">
-        <option value="yn">Za / przeciw / wstrzymało się</option>
-        <option value="choice">Wybór spośród kandydatów / opcji</option>
-      </select></label>
+    <label>Rodzaj<select id="mKind" onchange="kindChange()"><option value="yn">Za / przeciw / wstrzymało się</option><option value="choice">Wybór spośród kandydatów / opcji</option></select></label>
     <label>Wymagana większość<select id="mRule"></select></label>
   </div>
   <div id="mOptsWrap" class="hide" style="margin-top:10px">
@@ -139,8 +130,7 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
     <button id="mPub" onclick="mPublish()">Opublikuj wyniki</button>
   </div>
   <div class="msg" id="mMsg"></div>
-  <div class="note">Podczas głosowania tylko Ty widzisz głosy partii. „Opublikuj wyniki” zamyka głosowanie, pokazuje wyniki wszystkim i zapisuje je w historii. „Rozpocznij nowe głosowanie” zeruje głosy (jeśli poprzednie nie było opublikowane, nie trafi do historii).</div>
-
+  <div class="note">„Opublikuj wyniki” zamyka głosowanie, pokazuje wyniki wszystkim i zapisuje je w historii.</div>
   <h2 style="margin-top:18px">3. Sala obrad – dźwięki</h2>
   <div class="row">
     <button onclick="snd('gavel')">Otwarcie / zamknięcie posiedzenia (3 × laska)</button>
@@ -159,11 +149,11 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
     <button onclick="cIn()">Zamknij głosowanie za…</button>
     <button onclick="cCancel()">Anuluj odliczanie</button>
   </div>
-  <div class="note" style="margin-top:8px">Dźwięki są generowane w przeglądarce każdego gracza – każdy musi kliknąć przycisk „Dźwięk” na górze strony. Odliczanie pika w ostatnich 5 sekundach, a potem głosowanie zamyka się samo.</div>
+  <div class="note" style="margin-top:8px">Dźwięki są generowane w przeglądarce każdego gracza – każdy musi kliknąć przycisk „Dźwięk”. Odliczanie pika w ostatnich 5 sekundach.</div>
 </section>
 
 <p><a class="lnk" href="?a=history">📄 Pobierz historię głosowań (.txt)</a> &nbsp; <a class="lnk" id="admLink" href="#marshal">Panel marszałka</a></p>
-</main>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 var cur=null,votes={},voted=[],draft=null,pass='',lastKey='';
@@ -173,44 +163,29 @@ function num(v){v=parseInt(v,10);return isNaN(v)||v<0?0:v}
 function rid(){return 'p'+Math.random().toString(36).slice(2,8)}
 function sum(a){return a.reduce(function(x,y){return x+y},0)}
 
-const SUPABASE_URL = 'https://ggckmiocsslbwjtjfqxl.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_2QKIst8bdJbqJhyWBpwc8A_Ky8sBFHr';
+const SUPABASE_URL='https://ggckmiocsslbwjtjfqxl.supabase.co';
+const SUPABASE_KEY='sb_publishable_2QKIst8bdJbqJhyWBpwc8A_Ky8sBFHr';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
-const sb = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
-
-
-
-async function api(action, body = {}) {
-  const { data, error } = await sb.functions.invoke('sejm-api', {
-    body: { ...body, action }
-  });
-
-  if (error) {
-    let message = error.message || 'Błąd połączenia z Supabase';
-
-    try {
-      const details = await error.context.json();
-      if (details?.error) message = details.error;
-    } catch (_) {}
-
+async function api(action,body={}){
+  const {data,error}=await sb.functions.invoke('sejm-api',{body:{...body,action}});
+  if(error){
+    let message=error.message||'Błąd połączenia z Supabase';
+    try{const details=await error.context.json();if(details&&details.error)message=details.error}catch(_){}
     throw new Error(message);
   }
-
-  if (data?.error) {
-    throw new Error(data.error);
-  }
-
+  if(data&&data.error)throw new Error(data.error);
   return data;
-}api
+}
 
 async function poll(){
   try{
     var s=pass?await api('admin_state',{pass:pass}):await api('state');
-    cur=s.cur;votes=s.votes||{};voted=s.voted||[];renderAll();
-  }catch(e){}
+    cur=s.cur||null;votes=s.votes||{};voted=s.voted||[];
+    renderAll();
+  }catch(e){
+    $('info').innerHTML='<h2>Błąd pobierania danych</h2><div class="msg err">'+esc(e.message)+'</div>';
+  }
 }
 
 var RN={simple:'zwykła większość',abs:'bezwzględna większość','35':'3/5 głosów','23':'2/3 głosów',plur:'najwięcej głosów'};
@@ -225,12 +200,12 @@ function renderAll(){
 }
 function renderInfo(){
   if(!cur){$('info').innerHTML='<h2>Brak aktywnego głosowania</h2><div class="note">Poczekaj, aż marszałek rozpocznie głosowanie.</div>';return}
-  $('info').innerHTML='<h2>'+esc(cur.title)+'</h2><span class="badge">'+(cur.kind==='choice'?'Wybór: '+esc(cur.options.join(' / '))+' · ':'')+RN[cur.rule]+'</span> <span class="badge" style="color:var(--'+(cur.open?'ok':'no')+')">'+(cur.open?'Głosowanie otwarte':'Głosowanie zamknięte')+'</span> <span class="badge">'+(cur.published?'Wyniki jawne':'Głosowanie tajne')+'</span>';
+  $('info').innerHTML='<h2>'+esc(cur.title)+'</h2><span class="badge">'+(cur.kind==='choice'?'Wybór: '+esc((cur.options||[]).join(' / '))+' · ':'')+esc(RN[cur.rule]||cur.rule||'')+'</span> <span class="badge" style="color:var(--'+(cur.open?'ok':'no')+')">'+(cur.open?'Głosowanie otwarte':'Głosowanie zamknięte')+'</span> <span class="badge">'+(cur.published?'Wyniki jawne':'Głosowanie tajne')+'</span>';
 }
 
-/* ---- formularz gracza ---- */
+/* Formularz gracza */
 function vals(){return Array.prototype.map.call(document.querySelectorAll('.vin'),function(i){return num(i.value)})}
-function myParty(){var pid=$('pSel').value;return cur.parties.filter(function(x){return x.id===pid})[0]}
+function myParty(){var pid=$('pSel').value;return (cur&&cur.parties||[]).filter(function(x){return x.id===pid})[0]}
 function remain(){
   var p=myParty();if(!p)return;
   var left=p.s-sum(vals()),r=$('remain');
@@ -242,10 +217,11 @@ function renderForm(){
   if(!cur){box.classList.add('hide');return}
   box.classList.remove('hide');
   var key=cur.id+'|'+cur.open+'|'+JSON.stringify(cur.parties)+'|'+JSON.stringify(cur.options);
-  if(key===lastKey)return;lastKey=key;
+  if(key===lastKey)return;
+  lastKey=key;
   var saved='';try{saved=localStorage.getItem('sejm-party')||''}catch(e){}
-  $('pSel').innerHTML=cur.parties.map(function(p){return '<option value="'+p.id+'"'+(p.id===saved?' selected':'')+'>'+esc(p.n)+' ('+p.s+')</option>'}).join('');
-  var items=cur.kind==='choice'?cur.options.map(function(o){return{l:o,c:''}}).concat([{l:'Wstrzymało się',c:'ws'}]):[{l:'Za',c:'zs'},{l:'Przeciw',c:'ps'},{l:'Wstrzymało się',c:'ws'}];
+  $('pSel').innerHTML=(cur.parties||[]).map(function(p){return '<option value="'+esc(p.id)+'"'+(p.id===saved?' selected':'')+'>'+esc(p.n)+' ('+p.s+')</option>'}).join('');
+  var items=cur.kind==='choice'?(cur.options||[]).map(function(o){return{l:o,c:''}}).concat([{l:'Wstrzymało się',c:'ws'}]):[{l:'Za',c:'zs'},{l:'Przeciw',c:'ps'},{l:'Wstrzymało się',c:'ws'}];
   $('fields').innerHTML=items.map(function(it){return '<label class="'+it.c+'">'+esc(it.l)+'<input type="number" min="0" class="vin" value="0" oninput="remain()"></label>'}).join('');
   pickParty();$('send').disabled=!cur.open;
 }
@@ -256,23 +232,26 @@ function pickParty(){
   $('pinWrap').classList.toggle('hide',!(p&&p.hasPin));
   Array.prototype.forEach.call(document.querySelectorAll('.vin'),function(i){i.value=0});
   remain();
-  $('pMsg').textContent=voted.indexOf(pid)>=0?'Głosy Twojej partii zostały już wysłane. Możesz wysłać je ponownie, żeby je nadpisać.':'';$('pMsg').className='msg good';
+  $('pMsg').textContent=voted.indexOf(pid)>=0?'Głosy Twojej partii zostały już wysłane. Możesz wysłać je ponownie, żeby je nadpisać.':'';
+  $('pMsg').className='msg good';
 }
 async function sendVotes(){
   var m=$('pMsg'),v=vals(),pl={pid:$('pSel').value,pin:$('pin').value};
+  if(!cur)return;
   if(cur.kind==='choice'){pl.c=v.slice(0,-1);pl.w=v[v.length-1]}else{pl.z=v[0];pl.p=v[1];pl.w=v[2]}
   try{
     await api('vote',pl);
-    m.textContent='✅ Głosy wysłane (są tajne do czasu publikacji wyników).';m.className='msg good';poll();
+    m.textContent='✅ Głosy wysłane (są tajne do czasu publikacji wyników).';m.className='msg good';await poll();
   }catch(e){m.textContent=e.message;m.className='msg err'}
 }
 
-/* ---- wynik ---- */
+/* Wyliczanie wyniku */
 function evalVote(){
-  var k=cur.kind==='choice',N=0,cnt=0,W=0,Z=0,P=0,C=k?cur.options.map(function(){return 0}):[];
-  cur.parties.forEach(function(p){
-    var v=votes[p.id];N+=p.s;if(!v)return;cnt++;W+=v.w;
-    if(k)v.c.forEach(function(x,i){C[i]+=x});else{Z+=v.z;P+=v.p}
+  var k=cur.kind==='choice',N=0,cnt=0,W=0,Z=0,P=0,C=k?(cur.options||[]).map(function(){return 0}):[];
+  (cur.parties||[]).forEach(function(p){
+    var v=votes[p.id];N+=Number(p.s)||0;if(!v)return;cnt++;W+=num(v.w);
+    if(k)(v.c||[]).forEach(function(x,i){if(i<C.length)C[i]+=num(x)});
+    else{Z+=num(v.z);P+=num(v.p)}
   });
   var cols=k?C:[Z,P],cast=W+sum(cols),quorum=cast>=Math.ceil(N/2),ok=false,need=null,why='',res,verdict;
   if(!k){
@@ -282,7 +261,7 @@ function evalVote(){
     else{need=Math.ceil(cast*2/3);ok=cast>0&&Z>=need;why='2/3 głosów oddanych ('+cast+'): potrzeba co najmniej '+need+' za.'}
     res=ok?'Przyjęto':'Odrzucono';verdict=ok?'✅ PRZYJĘTO':'❌ ODRZUCONO';
   }else{
-    var mx=Math.max.apply(null,C),win=[];
+    var mx=C.length?Math.max.apply(null,C):0,win=[];
     C.forEach(function(x,i){if(x===mx&&mx>0)win.push(cur.options[i])});
     if(cur.rule==='abs'){need=Math.floor(N/2)+1;ok=mx>=need;why='Bezwzględna większość: zwycięzca musi dostać co najmniej '+need+' głosów (ustawowo '+N+' posłów).'}
     else{ok=win.length===1;why='Wygrywa opcja z największą liczbą głosów.'}
@@ -297,31 +276,36 @@ function evalVote(){
 function renderBoard(e){
   var rows=[['Głosowało',e.cast]];
   if(e.need!=null)rows.push(['W. ustawowa',e.need]);
-  if(e.k)cur.options.forEach(function(o,i){rows.push([o,e.cols[i]])});else rows.push(['Za',e.Z],['Przeciw',e.P]);
+  if(e.k)(cur.options||[]).forEach(function(o,i){rows.push([o,e.cols[i]||0])});
+  else rows.push(['Za',e.Z],['Przeciw',e.P]);
   rows.push(['Wstrzymało się',e.W]);
   var b=$('board');b.classList.remove('hide');
-  b.innerHTML='<div class="bt">Głosowanie nr '+cur.num+'</div><div class="bs">'+esc(cur.title)+'</div>'+rows.map(function(r){return '<div class="br"><span>'+esc(r[0])+'</span><span>'+r[1]+'</span></div>'}).join('');
+  b.innerHTML='<div class="bt">Głosowanie nr '+esc(cur.num==null?'—':cur.num)+'</div><div class="bs">'+esc(cur.title)+'</div>'+rows.map(function(r){return '<div class="br"><span>'+esc(r[0])+'</span><span>'+r[1]+'</span></div>'}).join('');
 }
 function renderResults(){
-  if(!cur){['thead','rows','tot','verdict','nums','bar','detail'].forEach(function(i){$(i).innerHTML=''});$('board').classList.add('hide');return}
+  if(!cur){
+    ['thead','rows','tot','verdict','nums','bar','detail'].forEach(function(i){$(i).innerHTML=''});
+    $('board').classList.add('hide');return;
+  }
   if(!(cur.published||pass)){renderHidden();return}
   var e=evalVote(),k=e.k,N=e.N,html='';
-  $('thead').innerHTML='<tr><th>Partia</th><th>Posłów</th>'+(k?cur.options.map(function(o){return '<th>'+esc(o)+'</th>'}).join(''):'<th class="zs">Za</th><th class="ps">Przeciw</th>')+'<th class="ws">Wstrz.</th><th>Nieobecni</th></tr>';
-  var nc=k?cur.options.length:2;
-  cur.parties.forEach(function(p){
+  $('thead').innerHTML='<tr><th>Partia</th><th>Posłów</th>'+(k?(cur.options||[]).map(function(o){return '<th>'+esc(o)+'</th>'}).join(''):'<th class="zs">Za</th><th class="ps">Przeciw</th>')+'<th class="ws">Wstrz.</th><th>Nieobecni</th></tr>';
+  var nc=k?(cur.options||[]).length:2;
+  (cur.parties||[]).forEach(function(p){
     var v=votes[p.id];
-    if(v){var cells=k?v.c:[v.z,v.p];
-      html+='<tr><td>'+esc(p.n)+'</td><td>'+p.s+'</td>'+cells.map(function(x,i){return '<td class="'+(k?'':i?'ps':'zs')+'">'+x+'</td>'}).join('')+'<td class="ws">'+v.w+'</td><td>'+(p.s-sum(cells)-v.w)+'</td></tr>'}
-    else html+='<tr><td>'+esc(p.n)+'</td><td>'+p.s+'</td><td colspan="'+(nc+2)+'" class="mut">brak głosów</td></tr>';
+    if(v){
+      var cells=k?(v.c||[]):[v.z,v.p];
+      html+='<tr><td>'+esc(p.n)+'</td><td>'+p.s+'</td>'+cells.map(function(x,i){return '<td class="'+(k?'':i?'ps':'zs')+'">'+num(x)+'</td>'}).join('')+'<td class="ws">'+num(v.w)+'</td><td>'+Math.max(0,p.s-sum(cells.map(num))-num(v.w))+'</td></tr>';
+    }else html+='<tr><td>'+esc(p.n)+'</td><td>'+p.s+'</td><td colspan="'+(nc+2)+'" class="mut">brak głosów</td></tr>';
   });
   $('rows').innerHTML=html;
   var absent=N-e.cast;
-  $('tot').innerHTML='<td>Razem</td><td>'+N+'</td>'+e.cols.map(function(x,i){return '<td class="'+(k?'':i?'ps':'zs')+'">'+x+'</td>'}).join('')+'<td class="ws">'+e.W+'</td><td>'+absent+'</td>';
+  $('tot').innerHTML='<td>Razem</td><td>'+N+'</td>'+e.cols.map(function(x,i){return '<td class="'+(k?'':i?'ps':'zs')+'">'+x+'</td>'}).join('')+'<td class="ws">'+e.W+'</td><td>'+Math.max(0,absent)+'</td>';
   var v=$('verdict'),pre=cur.published?'':'Podgląd (widzisz tylko Ty): ';
   v.innerHTML=pre+e.verdict;
   v.style.color=e.cast===0?'var(--mut)':!e.quorum?'var(--ab)':e.ok?'var(--ok)':'var(--no)';
   renderBoard(e);
-  $('nums').innerHTML=(k?cur.options.map(function(o,i){return '<span><b>'+e.cols[i]+'</b> '+esc(o)+'</span>'}).join(''):'<span class="zs"><b>'+e.Z+'</b> za</span><span class="ps"><b>'+e.P+'</b> przeciw</span>')+'<span class="ws"><b>'+e.W+'</b> wstrzymało</span><span><b>'+Math.max(absent,0)+'</b> nieobecnych</span>';
+  $('nums').innerHTML=(k?(cur.options||[]).map(function(o,i){return '<span><b>'+(e.cols[i]||0)+'</b> '+esc(o)+'</span>'}).join(''):'<span class="zs"><b>'+e.Z+'</b> za</span><span class="ps"><b>'+e.P+'</b> przeciw</span>')+'<span class="ws"><b>'+e.W+'</b> wstrzymało</span><span><b>'+Math.max(absent,0)+'</b> nieobecnych</span>';
   var t=Math.max(N,1);
   $('bar').innerHTML=k?'':'<div style="width:'+e.Z/t*100+'%;background:var(--ok)"></div><div style="width:'+e.P/t*100+'%;background:var(--no)"></div><div style="width:'+e.W/t*100+'%;background:var(--ab)"></div>';
   $('detail').textContent='Zagłosowało '+e.cnt+' z '+cur.parties.length+' partii. '+e.why+(e.quorum||e.cast===0?'':' Obecnych '+e.cast+' z '+N+', wymagane co najmniej '+Math.ceil(N/2)+'.');
@@ -330,179 +314,172 @@ function renderHidden(){
   $('board').classList.add('hide');
   $('thead').innerHTML='<tr><th>Partia</th><th>Posłów</th><th>Status</th></tr>';
   var cnt=0;
-  $('rows').innerHTML=cur.parties.map(function(p){
+  $('rows').innerHTML=(cur.parties||[]).map(function(p){
     var d=voted.indexOf(p.id)>=0;if(d)cnt++;
-    return '<tr><td>'+esc(p.n)+'</td><td>'+p.s+'</td><td class="'+(d?'good':'mut')+'">'+(d?'✅ zagłosowała':'czeka na głosy…')+'</td></tr>'}).join('');
+    return '<tr><td>'+esc(p.n)+'</td><td>'+p.s+'</td><td class="'+(d?'good':'mut')+'">'+(d?'✅ zagłosowała':'czeka na głosy…')+'</td></tr>';
+  }).join('');
   $('tot').innerHTML='';$('nums').innerHTML='';$('bar').innerHTML='';
   var v=$('verdict');v.textContent='🔒 Głosowanie tajne';v.style.color='var(--mut)';
   $('detail').textContent='Zagłosowało '+cnt+' z '+cur.parties.length+' partii. Wyniki pojawią się, gdy marszałek je opublikuje.';
-}
+}/* Panel marszałka */
+var RULES={
+  yn:[['simple','Zwykła (więcej za niż przeciw)'],['abs','Bezwzględna (> połowy ustawowej liczby posłów)'],['35','3/5 głosów'],['23','2/3 głosów']],
+  choice:[['plur','Najwięcej głosów wygrywa'],['abs','Bezwzględna (> połowy ustawowej liczby posłów)']]
+};
 
-/* ---- panel marszałka ---- */
-var RULES={yn:[['simple','Zwykła (więcej za niż przeciw)'],['abs','Bezwzględna (> połowy ustawowej liczby posłów)'],['35','3/5 głosów'],['23','2/3 głosów']],choice:[['plur','Najwięcej głosów wygrywa'],['abs','Bezwzględna (> połowy ustawowej liczby posłów)']]};
 function kindChange(sel){
   var k=$('mKind').value;
   $('mOptsWrap').classList.toggle('hide',k!=='choice');
-  $('mRule').innerHTML=RULES[k].map(function(r){return '<option value="'+r[0]+'">'+r[1]+'</option>'}).join('');
+  $('mRule').innerHTML=RULES[k].map(function(r){
+    return '<option value="'+r[0]+'">'+r[1]+'</option>';
+  }).join('');
   if(sel)$('mRule').value=sel;
 }
+kindChange();
 
-
-
-$('admLink').addEventListener('click', async function(ev) {
+$('admLink').addEventListener('click',async function(ev){
   ev.preventDefault();
-
-  if (pass) {
-    $('mBox').classList.toggle('hide');
-    return;
-  }
-
+  if(pass){$('mBox').classList.toggle('hide');return}
   $('loginBox').classList.remove('hide');
   $('loginEmail').focus();
 });
-
-$('cancelLogin').addEventListener('click', function() {
+$('cancelLogin').addEventListener('click',function(){
   $('loginBox').classList.add('hide');
-  $('loginMsg').textContent = '';
+  $('loginMsg').textContent='';
   $('loginForm').reset();
 });
 
-$('loginForm').addEventListener('submit', async function(ev) {
+$('loginForm').addEventListener('submit',async function(ev){
   ev.preventDefault();
-
-  const email = $('loginEmail').value.trim();
-  const password = $('loginPassword').value;
-
-  $('loginMsg').textContent = 'Logowanie…';
-  $('loginMsg').className = 'msg';
-
-  try {
-    const { error } = await sb.auth.signInWithPassword({
-      email: email,
-      password: password
-    });
-
-    if (error) throw error;
-
-    const result = await api('admin_state');
-
-    pass = 'authenticated';
-    cur = result.cur || null;
-    votes = result.votes || {};
-    voted = result.voted || [];
-
-    draft = {
-      parties: (result.parties || []).map(function(p) {
-        return {
-          id: p.id,
-          n: p.n,
-          s: Number(p.s),
-          pin: '',
-          hasPin: p.hasPin,
-          clearPin: false
-        };
-      })
-    };
-
-    lastKey = '';
+  var email=$('loginEmail').value.trim(),password=$('loginPassword').value;
+  $('loginMsg').textContent='Logowanie…';
+  $('loginMsg').className='msg';
+  try{
+    var resultLogin=await sb.auth.signInWithPassword({email:email,password:password});
+    if(resultLogin.error)throw resultLogin.error;
+    var result=await api('admin_state');
+    pass='authenticated';
+    cur=result.cur||null;
+    votes=result.votes||{};
+    voted=result.voted||[];
+    draft={parties:(result.parties||[]).map(function(p){
+      return{id:p.id,n:p.n,s:Number(p.s),pin:'',hasPin:p.hasPin,clearPin:false};
+    })};
+    lastKey='';
     $('loginBox').classList.add('hide');
     $('mBox').classList.remove('hide');
-
     renderDraft();
     renderAll();
-
-    $('loginMsg').textContent = '';
+    $('loginMsg').textContent='';
     $('loginForm').reset();
-    $('mBox').scrollIntoView({ behavior: 'smooth' });
-  } catch (error) {
-    $('loginMsg').textContent =
-      'Nie udało się zalogować: ' + error.message;
-    $('loginMsg').className = 'msg err';
+    $('mBox').scrollIntoView({behavior:'smooth'});
+  }catch(error){
+    $('loginMsg').textContent='Nie udało się zalogować: '+error.message;
+    $('loginMsg').className='msg err';
   }
 });
 
-async function checkSession() {
-  const { data, error } = await sb.auth.getSession();
-
-  if (error || !data.session) {
-    pass = '';
+async function checkSession(){
+  var sessionResult=await sb.auth.getSession();
+  if(sessionResult.error||!sessionResult.data.session){
+    pass='';
     $('mBox').classList.add('hide');
     return;
   }
-
-  try {
-    const result = await api('admin_state');
-
-    pass = 'authenticated';
-    cur = result.cur || null;
-    votes = result.votes || {};
-    voted = result.voted || [];
-
-    draft = {
-      parties: (result.parties || []).map(function(p) {
-        return {
-          id: p.id,
-          n: p.n,
-          s: Number(p.s),
-          pin: '',
-          hasPin: p.hasPin,
-          clearPin: false
-        };
-      })
-    };
-
+  try{
+    var result=await api('admin_state');
+    pass='authenticated';
+    cur=result.cur||null;
+    votes=result.votes||{};
+    voted=result.voted||[];
+    draft={parties:(result.parties||[]).map(function(p){
+      return{id:p.id,n:p.n,s:Number(p.s),pin:'',hasPin:p.hasPin,clearPin:false};
+    })};
     $('loginBox').classList.add('hide');
     $('mBox').classList.remove('hide');
     renderDraft();
     renderAll();
-  } catch (error) {
-    pass = '';
+  }catch(error){
+    pass='';
     $('mBox').classList.add('hide');
+    console.error('Nie udało się pobrać panelu marszałka:',error);
   }
 }
 
-
 function renderDraft(){
-  $('mParties').innerHTML=draft.parties.map(function(p,i){return '<div class="row" style="margin-bottom:6px">'+
-   '<input style="flex:1;min-width:130px" placeholder="Nazwa" value="'+esc(p.n)+'" oninput="draft.parties['+i+'].n=this.value">'+
-   '<input type="number" min="0" title="Liczba posłów" value="'+p.s+'" oninput="draft.parties['+i+'].s=num(this.value)">'+
-   '<input style="width:100px" placeholder="PIN" value="'+esc(p.pin)+'" oninput="draft.parties['+i+'].pin=this.value">'+
-   '<button class="sm" onclick="mDel('+i+')">✕</button></div>'}).join('');
+  $('mParties').innerHTML=draft.parties.map(function(p,i){
+    return '<div class="row" style="margin-bottom:6px">'+
+      '<input style="flex:1;min-width:130px" placeholder="Nazwa" value="'+esc(p.n)+'" oninput="draft.parties['+i+'].n=this.value">'+
+      '<input type="number" min="0" title="Liczba posłów" value="'+p.s+'" oninput="draft.parties['+i+'].s=num(this.value)">'+
+      '<input style="width:100px" placeholder="PIN" value="'+esc(p.pin)+'" oninput="draft.parties['+i+'].pin=this.value">'+
+      '<button class="sm" onclick="mDel('+i+')">✕</button></div>';
+  }).join('');
 }
 function mAdd(){draft.parties.push({id:rid(),n:'Nowa partia',s:10,pin:''});renderDraft()}
 function mDel(i){draft.parties.splice(i,1);renderDraft()}
 function say(t,ok){var m=$('mMsg');m.textContent=t;m.className='msg '+(ok?'good':'err')}
+
 async function mSave(){
-  try{await api('save_parties',{pass:pass,parties:draft.parties});say('✅ Partie zapisane.',true);lastKey='';poll()}
-  catch(e){say(e.message,false)}
+  try{
+    await api('save_parties',{pass:pass,parties:draft.parties});
+    say('✅ Partie zapisane.',true);
+    lastKey='';
+    await poll();
+  }catch(e){say(e.message,false)}
 }
 async function mStart(){
   if(cur&&!confirm('Rozpocząć nowe głosowanie? Obecne głosy zostaną skasowane.'))return;
   var opts=$('mOpts').value.split('\n').map(function(s){return s.trim()}).filter(Boolean);
-  try{await api('start',{pass:pass,title:$('mTitle').value,kind:$('mKind').value,options:opts,rule:$('mRule').value,parties:draft.parties});say('✅ Głosowanie rozpoczęte.',true);lastKey='';poll()}
-  catch(e){say(e.message,false)}
+  try{
+    await api('start',{
+      pass:pass,title:$('mTitle').value,kind:$('mKind').value,
+      options:opts,rule:$('mRule').value,parties:draft.parties
+    });
+    say('✅ Głosowanie rozpoczęte.',true);
+    lastKey='';
+    await poll();
+  }catch(e){say(e.message,false)}
 }
 async function mToggle(){
-  try{await api('toggle',{pass:pass});poll()}catch(e){say(e.message,false)}
+  try{await api('toggle',{pass:pass});await poll()}
+  catch(e){say(e.message,false)}
 }
+
+/* Publikacja: najpierw pobierz najnowsze głosy z backendu. */
 async function mPublish(){
   if(!confirm('Zamknąć głosowanie, pokazać wyniki wszystkim i zapisać w historii?'))return;
-  var e=evalVote();
-  try{await api('publish',{pass:pass,result:e.res,need:e.need});say('✅ Wyniki opublikowane i zapisane w historii.',true);poll()}catch(x){say(x.message,false)}
+  try{
+    var fresh=await api('admin_state');
+    cur=fresh.cur||null;
+    votes=fresh.votes||{};
+    voted=fresh.voted||[];
+
+    if(!cur)throw new Error('Brak aktywnego głosowania.');
+    if(cur.published)throw new Error('To głosowanie jest już opublikowane.');
+
+    var e=evalVote();
+    await api('publish',{pass:pass,result:e.res,need:e.need});
+
+    lastKey='';
+    await poll();
+    say('✅ Wysłano polecenie publikacji wyników.',true);
+  }catch(x){
+    say('Nie udało się opublikować wyników: '+x.message,false);
+  }
 }
 
-checkSession().then(function() {
-  poll();
-});
+/* Uruchomienie strony i odświeżanie */
+checkSession().then(function(){return poll()});
+setInterval(poll,3000);
 
-setInterval(poll, 3000);
-
-/* ---- dźwięki sali obrad ---- */
-var AC=null,MASTER=null,sndOn=true,vol=0.7,lastSeq=null,clo=null;
+/* Dźwięki sali obrad */
+var AC=null,MASTER=null,sndOn=true,vol=.7,lastSeq=null,clo=null;
 try{
   if(localStorage.getItem('sejm-snd')==='0')sndOn=false;
-  var vv=localStorage.getItem('sejm-vol');if(vv!==null&&!isNaN(parseFloat(vv)))vol=Math.min(1,Math.max(0,parseFloat(vv)));
+  var vv=localStorage.getItem('sejm-vol');
+  if(vv!==null&&!isNaN(parseFloat(vv)))vol=Math.min(1,Math.max(0,parseFloat(vv)));
 }catch(e){}
+
 var GEST=['pointerdown','touchstart','keydown','click'];
 function unlock(){if(sndOn)audio()}
 function dropUnlock(){GEST.forEach(function(ev){document.removeEventListener(ev,unlock,true)})}
@@ -510,72 +487,87 @@ GEST.forEach(function(ev){document.addEventListener(ev,unlock,true)});
 function running(){return !!AC&&AC.state==='running'}
 function audio(){
   if(!AC){
-    var C=window.AudioContext||window.webkitAudioContext;if(!C)return null;
-    AC=new C();var comp=AC.createDynamicsCompressor();MASTER=AC.createGain();MASTER.gain.value=vol;MASTER.connect(comp);comp.connect(AC.destination);
+    var C=window.AudioContext||window.webkitAudioContext;
+    if(!C)return null;
+    AC=new C();
+    var comp=AC.createDynamicsCompressor();
+    MASTER=AC.createGain();
+    MASTER.gain.value=vol;
+    MASTER.connect(comp);
+    comp.connect(AC.destination);
     AC.onstatechange=sndLabel;
   }
   if(AC.state==='suspended')AC.resume();
   return AC;
 }
 function oscTone(t,f,dur,type,peak){
-  var o=AC.createOscillator(),g=AC.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);
-  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+0.01);
-  g.gain.setValueAtTime(peak,t+Math.max(0.02,dur-0.04));g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  o.connect(g);g.connect(MASTER);o.start(t);o.stop(t+dur+0.05);
+  var o=AC.createOscillator(),g=AC.createGain();
+  o.type=type||'sine';
+  o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(.0001,t);
+  g.gain.exponentialRampToValueAtTime(peak,t+.01);
+  g.gain.setValueAtTime(peak,t+Math.max(.02,dur-.04));
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g);g.connect(MASTER);o.start(t);o.stop(t+dur+.05);
 }
 function noiseBuf(d){
   var n=Math.floor(AC.sampleRate*d),b=AC.createBuffer(1,n,AC.sampleRate),a=b.getChannelData(0);
   for(var i=0;i<n;i++)a[i]=Math.random()*2-1;
   var s=AC.createBufferSource();s.buffer=b;return s;
 }
-function knock(t){ // uderzenie laską o podłogę
-  var o=AC.createOscillator(),g=AC.createGain();o.type='sine';
-  o.frequency.setValueAtTime(190,t);o.frequency.exponentialRampToValueAtTime(55,t+0.2);
-  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(1,t+0.004);g.gain.exponentialRampToValueAtTime(0.0001,t+0.4);
-  o.connect(g);g.connect(MASTER);o.start(t);o.stop(t+0.45);
-  var n=noiseBuf(0.06),f=AC.createBiquadFilter(),g2=AC.createGain();
-  f.type='bandpass';f.frequency.value=1100;f.Q.value=0.7;
-  g2.gain.setValueAtTime(0.7,t);g2.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
+function knock(t){
+  var o=AC.createOscillator(),g=AC.createGain();
+  o.type='sine';o.frequency.setValueAtTime(190,t);o.frequency.exponentialRampToValueAtTime(55,t+.2);
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(1,t+.004);
+  g.gain.exponentialRampToValueAtTime(.0001,t+.4);
+  o.connect(g);g.connect(MASTER);o.start(t);o.stop(t+.45);
+  var n=noiseBuf(.06),f=AC.createBiquadFilter(),g2=AC.createGain();
+  f.type='bandpass';f.frequency.value=1100;f.Q.value=.7;
+  g2.gain.setValueAtTime(.7,t);g2.gain.exponentialRampToValueAtTime(.0001,t+.06);
   n.connect(f);f.connect(g2);g2.connect(MASTER);n.start(t);
 }
-function bellHit(t,f0,peak,dec){ // jedno uderzenie w dzwonek (składowe niecałkowite)
-  [[1,1],[2,0.5],[2.76,0.4],[5.4,0.2],[8.93,0.1]].forEach(function(p,i){
-    var o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=f0*p[0];
-    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak*p[1],t+0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+dec/(1+i*0.6));
-    o.connect(g);g.connect(MASTER);o.start(t);o.stop(t+dec+0.05);
+function bellHit(t,f0,peak,dec){
+  [[1,1],[2,.5],[2.76,.4],[5.4,.2],[8.93,.1]].forEach(function(p,i){
+    var o=AC.createOscillator(),g=AC.createGain();
+    o.type='sine';o.frequency.value=f0*p[0];
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(peak*p[1],t+.004);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dec/(1+i*.6));
+    o.connect(g);g.connect(MASTER);o.start(t);o.stop(t+dec+.05);
   });
 }
-function elBell(t,dur,f){ // dzwonek elektryczny – szybkie bicie młoteczka
-  var n=Math.round(dur/0.075);
-  for(var i=0;i<n;i++)bellHit(t+i*0.075,f,0.13,0.22);
+function elBell(t,dur,f){
+  var n=Math.round(dur/.075);
+  for(var i=0;i<n;i++)bellHit(t+i*.075,f,.13,.22);
 }
 function play(type,force){
-  if(!sndOn)return;var c=audio();if(!c)return;
+  if(!sndOn)return;
+  var c=audio();if(!c)return;
   if(c.state!=='running'&&!force)return;
-  var t=c.currentTime+0.04;
-  if(type==='gavel'){[0,0.6,1.2].forEach(function(d){knock(t+d)})}
-  else if(type==='bell'){[0,0.12,0.2,0.34,0.42,0.55,0.63,0.78,0.86,1.0].forEach(function(d,k){bellHit(t+d,1380+(k%3)*45,0.16,0.9)})}
-  else if(type==='timer'){elBell(t,1.1,1500)}
-  else if(type==='call'){[0,1.7,3.4].forEach(function(d){elBell(t+d,1.1,1300)})}
-  else if(type==='vstart'){oscTone(t,1000,0.13,'sine',0.35);oscTone(t+0.25,1000,0.13,'sine',0.35)}
-  else if(type==='vend'){oscTone(t,780,0.9,'sine',0.35)}
-  else if(type==='tick'){oscTone(t,1250,0.07,'sine',0.3)}
+  var t=c.currentTime+.04;
+  if(type==='gavel')[0,.6,1.2].forEach(function(d){knock(t+d)});
+  else if(type==='bell')[0,.12,.2,.34,.42,.55,.63,.78,.86,1].forEach(function(d,k){bellHit(t+d,1380+(k%3)*45,.16,.9)});
+  else if(type==='timer')elBell(t,1.1,1500);
+  else if(type==='call')[0,1.7,3.4].forEach(function(d){elBell(t+d,1.1,1300)});
+  else if(type==='vstart'){oscTone(t,1000,.13,'sine',.35);oscTone(t+.25,1000,.13,'sine',.35)}
+  else if(type==='vend')oscTone(t,780,.9,'sine',.35);
+  else if(type==='tick')oscTone(t,1250,.07,'sine',.3);
 }
 function sndLabel(){
   var txt=!sndOn?'Dźwięk: wyłączony (kliknij, aby włączyć)':running()?'Dźwięk: włączony (kliknij, aby wyłączyć)':'Dźwięk: włączony – kliknij gdziekolwiek na stronie, aby go uruchomić';
-  var b=$('sndBtn');if(b.textContent!==txt)b.textContent=txt;
+  var b=$('sndBtn');if(b&&b.textContent!==txt)b.textContent=txt;
   if(running())dropUnlock();
 }
 function sndSave(){try{localStorage.setItem('sejm-snd',sndOn?'1':'0')}catch(e){}}
 function sndToggle(){
-  if(sndOn&&!running()){audio();play('tick',true);sndLabel();return} // to kliknięcie tylko uruchamia dźwięk
+  if(sndOn&&!running()){audio();play('tick',true);sndLabel();return}
   sndOn=!sndOn;sndSave();
   if(sndOn){audio();play('tick',true)}
   sndLabel();
 }
 function sndVolChange(){
-  vol=num($('sndVol').value)/100;if(MASTER)MASTER.gain.value=vol;
+  vol=num($('sndVol').value)/100;
+  if(MASTER)MASTER.gain.value=vol;
   try{localStorage.setItem('sejm-vol',String(vol))}catch(e){}
 }
 async function sndPoll(){
@@ -596,7 +588,8 @@ function uiTick(){
     q=(clo.dl-now)/1000;sc=Math.ceil(q);
     if(q>0&&sc<=5&&sc>=1&&clo.last!==sc){clo.last=sc;play('tick')}
     if(q<=0&&!clo.fired){clo.fired=true;play('vend')}
-    xb.classList.toggle('hide',q<=0);$('closeSec').textContent=Math.max(sc,0);
+    xb.classList.toggle('hide',q<=0);
+    $('closeSec').textContent=Math.max(sc,0);
     if(q<-2)clo=null;
   }else xb.classList.add('hide');
 }
@@ -604,18 +597,29 @@ function sndMsg(t,ok){var m=$('mMsg');m.textContent=t;m.className='msg '+(ok?'go
 function sndEnable(){if(!sndOn){sndOn=true;sndSave()}audio();sndLabel()}
 async function snd(t){
   sndEnable();
-  try{var r=await api('sound',{pass:pass,type:t});lastSeq=r.seq;play(t)}catch(e){sndMsg(e.message,false)}
+  try{var r=await api('sound',{pass:pass,type:t});lastSeq=r.seq;play(t)}
+  catch(e){sndMsg(e.message,false)}
 }
 async function cIn(){
   sndEnable();
-  try{await api('close_in',{pass:pass,secs:num($('cSecs').value)});sndPoll()}catch(e){sndMsg(e.message,false)}
+  try{await api('close_in',{pass:pass,secs:num($('cSecs').value)});sndPoll()}
+  catch(e){sndMsg(e.message,false)}
 }
-async function cCancel(){try{await api('close_cancel',{pass:pass});clo=null;sndPoll()}catch(e){sndMsg(e.message,false)}}
-async function mAutoSnd(){try{await api('snd_auto',{pass:pass,on:$('mAuto').checked})}catch(e){sndMsg(e.message,false)}}
+async function cCancel(){
+  try{await api('close_cancel',{pass:pass});clo=null;sndPoll()}
+  catch(e){sndMsg(e.message,false)}
+}
+async function mAutoSnd(){
+  try{await api('snd_auto',{pass:pass,on:$('mAuto').checked})}
+  catch(e){sndMsg(e.message,false)}
+}
 
-$('sndVol').value=Math.round(vol*100);sndLabel();
-sndPoll();setInterval(sndPoll,1200);setInterval(uiTick,150);setInterval(sndLabel,1000);
-
+$('sndVol').value=Math.round(vol*100);
+sndLabel();
+sndPoll();
+setInterval(sndPoll,1200);
+setInterval(uiTick,150);
+setInterval(sndLabel,1000);
 </script>
 </body>
 </html>
