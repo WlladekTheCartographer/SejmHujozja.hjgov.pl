@@ -109,7 +109,10 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
 </section>
 
 <section class="card hide" id="mBox">
-  <h2>Panel marszałka</h2>
+  <div class="row" style="justify-content:space-between;align-items:center">
+    <h2>Panel marszałka</h2>
+    <button type="button" onclick="mLogout()">Wyloguj marszałka</button>
+  </div>
   <h2>1. Partie <span class="note">(PIN opcjonalny – jeśli ustawisz, gracz musi go podać)</span></h2>
   <div id="mParties"></div>
   <div class="row" style="margin-top:8px">
@@ -189,7 +192,26 @@ async function poll(){
     $('info').innerHTML='<h2>Błąd pobierania danych</h2><div class="msg err">'+esc(e.message)+'</div>';
   }
 }
+async function mLogout(){
+  try{
+    var result = await sb.auth.signOut();
+    if(result.error) throw result.error;
 
+    pass = '';
+    draft = null;
+    lastKey = '';
+
+    $('mBox').classList.add('hide');
+    $('loginBox').classList.add('hide');
+    $('loginForm').reset();
+    $('loginMsg').textContent = '';
+
+    await poll();
+    $('info').scrollIntoView({behavior:'smooth', block:'start'});
+  }catch(e){
+    say('Nie udało się wylogować: ' + e.message, false);
+  }
+}
 var RN={simple:'zwykła większość',abs:'bezwzględna większość','35':'3/5 głosów','23':'2/3 głosów',plur:'najwięcej głosów'};
 function renderAll(){
   renderInfo();renderForm();renderResults();
@@ -417,7 +439,20 @@ function renderDraft(){
       '<button class="sm" onclick="mDel('+i+')">✕</button></div>';
   }).join('');
 }
-function mAdd(){draft.parties.push({id:rid(),n:'Nowa partia',s:10,pin: p.pin || ''});renderDraft()}
+function mAdd(){
+  if(!draft) draft = {parties:[]};
+
+  draft.parties.push({
+    id: rid(),
+    n: 'Nowa partia',
+    s: 10,
+    pin: '',
+    hasPin: false,
+    clearPin: false
+  });
+
+  renderDraft();
+}
 function mDel(i){draft.parties.splice(i,1);renderDraft()}
 function say(t,ok){var m=$('mMsg');m.textContent=t;m.className='msg '+(ok?'good':'err')}
 
