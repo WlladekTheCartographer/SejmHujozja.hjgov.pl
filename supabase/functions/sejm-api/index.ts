@@ -38,7 +38,7 @@ function safeParty(p: any) {
     id: p.id ?? p.party_id,
     n: p.name ?? p.party_name,
     s: Number(p.seats),
-    hasPin: Boolean(p.pin_hash),
+    hasPin: Boolean(p.pin_hash || p.pin_plain),
   };
 }
 
@@ -160,13 +160,16 @@ async function loadState(isAdmin: boolean) {
   if (ids.length) {
     const { data: live, error: liveErr } = await admin
       .from("parties")
-      .select("id,pin_hash")
+      .select("id,pin_hash,pin_plain")
       .in("id", ids);
 
     if (liveErr) throw liveErr;
 
     const pinMap = new Map(
-      (live || []).map((p: any) => [p.id, Boolean(p.pin_hash)]),
+      (live || []).map((p: any) => [
+      p.id,
+      Boolean(p.pin_hash || p.pin_plain),
+    ]),
     );
 
     parties.forEach(
@@ -380,17 +383,27 @@ Deno.serve(async (req: Request) => {
         return fail("Ta partia nie bierze udziału w bieżącym głosowaniu.");
       }
 
-      if (party.pin_hash) {
-        const pin = String(body.pin || "");
+      if (party.pin_plain || party.pin_hash) {
+  const pin = String(body.pin || "");
 
-        if (!pin) return fail("Wpisz PIN partii.", 401);
+  if (!pin) {
+    return fail("Wpisz PIN partii.", 401);
+  }
 
-        const candidate = await sha256(`${party.pin_salt}:${pin}`);
+  if (party.pin_plain) {
+    if (pin !== party.pin_plain) {
+      return fail("Nieprawidłowy PIN partii.", 401);
+    }
+  } else {
+    // Zgodność ze starymi PIN-ami, które nie zostały
+    // jeszcze ponownie ustawione.
+    const candidate = await sha256(`${party.pin_salt}:${pin}`);
 
-        if (candidate !== party.pin_hash) {
-          return fail("Nieprawidłowy PIN partii.", 401);
-        }
-      }
+    if (candidate !== party.pin_hash) {
+      return fail("Nieprawidłowy PIN partii.", 401);
+    }
+  }
+}
 
       const seats = Number(sp.seats);
       const kind = session.kind;
@@ -427,9 +440,13 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      if (all.reduce((a, b) => a + b, 0) !== seats) {
-        return fail(`Rozdziel dokładnie ${seats} głosów.`);
-      }
+      const total = all.reduce((a, b) => a + b, 0);
+
+if (total > seats) {
+  return fail(
+    `Rozdzielono ${total} głosów, ale partia ma tylko ${seats} posłów.`,
+  );
+}
 
       const { error } = await admin
         .from("votes")
@@ -457,7 +474,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: parties, error } = await admin
         .from("parties")
-        .select("id,name,seats,pin_hash,active,sort_order")
+        .select("id,name,seats,pin_hash,pin_plain,active,sort_order")
         .eq("active", true)
         .order("sort_order")
         .order("name");
@@ -469,12 +486,13 @@ Deno.serve(async (req: Request) => {
       return json({
         ...state,
         parties: (parties || []).map((p: any) => ({
-          id: p.id,
-          n: p.name,
-          s: p.seats,
-          hasPin: Boolean(p.pin_hash),
-          active: p.active,
-        })),
+        id: p.id,
+        n: p.name,
+        s: p.seats,
+        pin: p.pin_plain || "",
+        hasPin: Boolean(p.pin_hash || p.pin_plain),
+        active: p.active,
+      })),
         autoSound: c.auto_sound,
       });
     }
@@ -526,14 +544,25 @@ Deno.serve(async (req: Request) => {
       for (const p of clean) {
         const { data: existing, error: findErr } = await admin
           .from("parties")
-          .select("pin_salt,pin_hash")
+          .select("pin_salt,pin_hash,pin_plain")
           .eq("id", p.id)
           .maybeSingle();
 
         if (findErr) throw findErr;
 
         let pin_salt = existing?.pin_salt || crypto.randomUUID();
-        let pin_hash = existing?.pin_hash || "";
+let pin_hash = existing?.pin_hash || "";
+let pin_plain = existing?.pin_plain || "";
+
+if (p.clearPin) {
+  pin_salt = crypto.randomUUID();
+  pin_hash = "";
+  pin_plain = "";
+} else if (p.pin) {
+  pin_salt = crypto.randomUUID();
+  pin_hash = await sha256(`${pin_salt}:${p.pin}`);
+  pin_plain = p.pin;
+}
 
         if (p.clearPin) {
           pin_salt = crypto.randomUUID();
@@ -551,6 +580,7 @@ Deno.serve(async (req: Request) => {
           active: true,
           pin_salt,
           pin_hash,
+          pin_plain,
         };
 
         const { error } = await admin
