@@ -63,6 +63,19 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
 
 <section class="card" id="info"></section>
 
+<section class="card hide" id="playerBox">
+  <h2>Twoje głosy</h2>
+  <div class="row">
+    <label>Twoja partia<select id="pSel" onchange="pickParty()"></select></label>
+    <label id="pinWrap" class="hide">PIN partii<input type="password" id="pin" style="width:110px" autocomplete="off"></label>
+    <span id="fields" style="display:contents"></span>
+    <button class="pri" id="send" onclick="sendVotes()">Wyślij głosy</button>
+  </div>
+  <div class="remain" id="remain"></div>
+  <div class="msg" id="pMsg"></div>
+  <div class="note">Możesz wysłać głosy ponownie (nadpiszą poprzednie), dopóki marszałek nie zamknie głosowania.</div>
+</section>
+
 <!-- DODANA SEKCJA WYNIKÓW -->
 <section class="card" id="resultsBox">
   <h2>Wyniki głosowania</h2>
@@ -80,18 +93,7 @@ a.lnk{color:var(--mut);font-size:.85rem;cursor:pointer;text-decoration:underline
   </div>
 </section>
 
-<section class="card hide" id="playerBox">
-  <h2>Twoje głosy</h2>
-  <div class="row">
-    <label>Twoja partia<select id="pSel" onchange="pickParty()"></select></label>
-    <label id="pinWrap" class="hide">PIN partii<input type="password" id="pin" style="width:110px" autocomplete="off"></label>
-    <span id="fields" style="display:contents"></span>
-    <button class="pri" id="send" onclick="sendVotes()">Wyślij głosy</button>
-  </div>
-  <div class="remain" id="remain"></div>
-  <div class="msg" id="pMsg"></div>
-  <div class="note">Możesz wysłać głosy ponownie (nadpiszą poprzednie), dopóki marszałek nie zamknie głosowania.</div>
-</section>
+
 
 <section class="card hide" id="loginBox">
   <h2>Logowanie marszałka</h2>
