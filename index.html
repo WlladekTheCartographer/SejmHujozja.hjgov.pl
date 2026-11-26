@@ -159,36 +159,22 @@ const sb = window.supabase.createClient(
   SUPABASE_KEY
 );
 
+
+
 async function api(action, body = {}) {
-  const functions = {
-    state: 'public-state',
-    vote: 'submit-vote',
-    admin_state: 'admin-state',
-    save_parties: 'admin-save-parties',
-    start: 'admin-start',
-    toggle: 'admin-toggle',
-    publish: 'admin-publish',
-    tick: 'sound-state',
-    sound: 'admin-sound',
-    close_in: 'admin-close-in',
-    close_cancel: 'admin-close-cancel',
-    snd_auto: 'admin-sound-auto',
-    history: 'public-history'
-  };
-
-  const name = functions[action];
-
-  if (!name) {
-    throw new Error('Nieznana operacja');
-  }
-
-  const { data, error } = await sb.functions.invoke(
-    name,
-    { body }
-  );
+  const { data, error } = await sb.functions.invoke('sejm-api', {
+    body: { ...body, action }
+  });
 
   if (error) {
-    throw new Error(error.message);
+    let message = error.message || 'Błąd połączenia z Supabase';
+
+    try {
+      const details = await error.context.json();
+      if (details?.error) message = details.error;
+    } catch (_) {}
+
+    throw new Error(message);
   }
 
   if (data?.error) {
@@ -196,7 +182,7 @@ async function api(action, body = {}) {
   }
 
   return data;
-}
+}api
 
 async function poll(){
   try{
@@ -339,14 +325,51 @@ function kindChange(sel){
   if(sel)$('mRule').value=sel;
 }
 
-async function adminLogin(){
-  const { data, error } = await sb.auth.signInWithPassword({
-  email: email,
-  password: password
-});
 
-if (error) throw error;
+async function adminLogin() {
+  const email = prompt('Podaj adres e-mail konta marszałka:');
+  if (email === null || !email.trim()) return;
+
+  const password = prompt('Podaj hasło do tego konta:');
+  if (password === null || !password) return;
+
+  try {
+    const { error } = await sb.auth.signInWithPassword({
+      email: email.trim(),
+      password
+    });
+
+    if (error) throw error;
+
+    // Backend sprawdzi, czy konto ma uprawnienia marszałka.
+    const result = await api('admin_state');
+
+    pass = 'authenticated';
+    cur = result.cur;
+    votes = result.votes || {};
+    voted = result.voted || [];
+
+    draft = {
+      parties: (result.parties || []).map(p => ({
+        id: p.id,
+        n: p.n,
+        s: Number(p.s),
+        pin: ''
+      }))
+    };
+
+    lastKey = '';
+    $('mBox').classList.remove('hide');
+    renderDraft();
+    renderAll();
+    say('Zalogowano do panelu marszałka.', true);
+    $('mBox').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) {
+    pass = '';
+    alert('Nie udało się zalogować: ' + e.message);
+  }
 }
+
 function renderDraft(){
   $('mParties').innerHTML=draft.parties.map(function(p,i){return '<div class="row" style="margin-bottom:6px">'+
    '<input style="flex:1;min-width:130px" placeholder="Nazwa" value="'+esc(p.n)+'" oninput="draft.parties['+i+'].n=this.value">'+
