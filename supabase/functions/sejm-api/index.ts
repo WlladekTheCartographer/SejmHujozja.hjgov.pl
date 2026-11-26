@@ -982,8 +982,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return fail("Nieznana operacja.");
-  } 
-} catch (e) {
+  } catch (e) {
   console.error("Błąd sejm-api:", e);
 
   const err = e as {
@@ -1011,4 +1010,5 @@ Deno.serve(async (req: Request) => {
       ? 401
       : 500,
   );
+}
 });
