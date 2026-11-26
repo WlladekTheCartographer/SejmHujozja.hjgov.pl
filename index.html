@@ -363,7 +363,7 @@ $('loginForm').addEventListener('submit',async function(ev){
     votes=result.votes||{};
     voted=result.voted||[];
     draft={parties:(result.parties||[]).map(function(p){
-      return{id:p.id,n:p.n,s:Number(p.s),pin:'',hasPin:p.hasPin,clearPin:false};
+      return{id:p.id,n:p.n,s:Number(p.s),pin: p.pin || '',hasPin:p.hasPin,clearPin:false};
     })};
     lastKey='';
     $('loginBox').classList.add('hide');
@@ -393,7 +393,7 @@ async function checkSession(){
     votes=result.votes||{};
     voted=result.voted||[];
     draft={parties:(result.parties||[]).map(function(p){
-      return{id:p.id,n:p.n,s:Number(p.s),pin:'',hasPin:p.hasPin,clearPin:false};
+      return{id:p.id,n:p.n,s:Number(p.s),pin: p.pin || '',hasPin:p.hasPin,clearPin:false};
     })};
     $('loginBox').classList.add('hide');
     $('mBox').classList.remove('hide');
@@ -415,7 +415,7 @@ function renderDraft(){
       '<button class="sm" onclick="mDel('+i+')">✕</button></div>';
   }).join('');
 }
-function mAdd(){draft.parties.push({id:rid(),n:'Nowa partia',s:10,pin:''});renderDraft()}
+function mAdd(){draft.parties.push({id:rid(),n:'Nowa partia',s:10,pin: p.pin || ''});renderDraft()}
 function mDel(i){draft.parties.splice(i,1);renderDraft()}
 function say(t,ok){var m=$('mMsg');m.textContent=t;m.className='msg '+(ok?'good':'err')}
 
