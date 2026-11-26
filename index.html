@@ -291,9 +291,7 @@ function renderResults(){
   var e=evalVote(),k=e.k,N=e.N,html='';
   $('thead').innerHTML='<tr><th>Partia</th><th>Posłów</th>'+(k?(cur.options||[]).map(function(o){return '<th>'+esc(o)+'</th>'}).join(''):'<th class="zs">Za</th><th class="ps">Przeciw</th>')+'<th class="ws">Wstrz.</th><th>Nieobecni</th></tr>';
   var nc=k?(cur.options||[]).length:2;
-  (cur.parties||[]).slice().sort(function(a,b){
-  return Number(b.s||0)-Number(a.s||0);
-  }).forEach(function(p){
+  (cur.parties||[]).forEach(function(p){
     var v=votes[p.id];
     if(v){
       var cells=k?(v.c||[]):[v.z,v.p];
